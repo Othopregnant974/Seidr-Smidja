@@ -2,8 +2,14 @@
 **Amendment date:** 2026-05-06
 **Amends:** `INTERFACE.md` (same directory)
 **Reason:** H-022 (seidr list-assets CLI command implementation) + H-023 (seidr bootstrap-hoard documentation gap).
-**Status:** PENDING — awaiting Phase C Auditor verification. Scribe will fold into canonical INTERFACE.md on ratification.
+**Status:** **RATIFIED 2026-05-06 by [D-009](../../../docs/DECISIONS/D-009-list-assets-and-bootstrap-hoard-cli.md).** Filename retains `_v0_1_1_pending` suffix for archival continuity per additive-only rule, but the contract documented herein is effective and binding as of the ratification date.
 **Author:** Eldra Járnsdóttir (Forge Worker), Hardening Phase B.
+
+---
+
+## Ratification Stamp — 2026-05-06
+
+Volmarr Wyrd ratified `seidr list-assets` (now implemented) and `seidr bootstrap-hoard` (now formally documented) via [D-009](../../../docs/DECISIONS/D-009-list-assets-and-bootstrap-hoard-cli.md). AUDIT-003 (genesis) and H-022/H-023 (hardening) are fully closed.
 
 ---
 

@@ -76,6 +76,7 @@ Proposed  →  Accepted  →  Superseded (by D-NNN)
 | [D-006](D-006-oracle-eye-render-failure-behavior.md) | Oracle Eye Render-Failure Behavior | Accepted | 2026-05-06 | Render failure is soft: `.vrm` + structured warning returned; build not withheld |
 | [D-007](D-007-blender-subprocess-pattern-v0_1.md) | Blender Subprocess Pattern v0.1 | Accepted | 2026-05-06 | Two separate subprocess invocations (Forge + Oracle Eye); single-session optimization deferred |
 | [D-008](D-008-cli-command-name-inspect.md) | CLI Command Name: `seidr inspect` | Accepted | 2026-05-06 | `seidr inspect` is canonical (not `seidr check`); ratifies AUDIT-003 partial closure; `list-assets` deferred to v0.1.1 |
+| [D-009](D-009-list-assets-and-bootstrap-hoard-cli.md) | `seidr list-assets` Implemented + `seidr bootstrap-hoard` Documented | Accepted | 2026-05-06 | Both deferred D-008 sub-items closed; v0.1.1-pending INTERFACE amendment ratified; AUDIT-003 fully closed |
 
 ---
 
