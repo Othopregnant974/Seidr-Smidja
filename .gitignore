@@ -76,3 +76,7 @@ desktop.ini
 *.tmp
 *.temp
 ~$*
+
+# Symlinked binary assets (point outside repo)
+data/hoard/bases/*.vrm
+data/hoard/bases/*.fbx

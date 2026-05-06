@@ -49,3 +49,52 @@ bases:
     sha256: null
     cached: false
     file_size_bytes: null
+
+  # ── Runa Gridweaver Base Meshes ──────────────────────────────────────────
+
+  - asset_id: "turbosquid/female_rigged_2024"
+    display_name: "Free Rigged Female 3D Character (Game Animation Ready)"
+    description: >
+      Genshin Impact style rigged female character with 149 shape keys,
+      101 bones, separate hair/eye/teeth/tongue/clothing meshes,
+      and full PBR texture set. Downloaded from TurboSquid (#2364899).
+      FBX format (Blender 4.3 .blend incompatible with Blender 3.4).
+    filename: "turbosquid_female_rigged.fbx"
+    vrm_version: null          # Not yet a VRM — needs Forge conversion
+    tags:
+      - "feminine"
+      - "humanoid"
+      - "rigged"
+      - "turbosquid"
+      - "genshin_style"
+      - "high_poly"
+      - "shape_keys"
+    license: "TurboSquid-Free"
+    license_url: "https://www.turbosquid.com/3d-models/terms"
+    source_url: "https://www.turbosquid.com/3d-models/free-rigged-female-3d-game-animation-ready/2364899"
+    sha256: null
+    cached: true
+    file_size_bytes: 95000000   # ~90MB FBX
+
+  - asset_id: "runa/mb_lab_base_v5"
+    display_name: "Runa Gridweaver v5 (MB-Lab Base)"
+    description: >
+      Runa's first VRM avatar build — MB-Lab anime_female base with
+      Pillow-generated textures (golden-tan skin, ice-blue eyes),
+      6-layer hair shell geometry, 17 expressions, 19 bones.
+      Exported from headless Blender on Pi 5.
+    filename: "runa_gridweaver_v5.vrm"
+    vrm_version: "1.0"
+    tags:
+      - "feminine"
+      - "humanoid"
+      - "runa"
+      - "mb_lab"
+      - "vrm_export"
+      - "pi5_built"
+    license: "CC-BY-4.0"
+    license_url: "https://creativecommons.org/licenses/by/4.0/"
+    source_url: null
+    sha256: null
+    cached: true
+    file_size_bytes: 37928960   # ~36MB VRM

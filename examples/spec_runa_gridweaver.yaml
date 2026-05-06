@@ -1,0 +1,129 @@
+avatar_id: runa_gridweaver_v2
+base_asset_id: turbosquid/female_rigged_2024
+display_name: Runa Gridweaver
+
+body:
+  arm_length_scale: 1.0
+  head_scale: 1.0
+  height_scale: 1.0
+  leg_length_scale: 1.0
+  lower_body_scale: 1.02
+  upper_body_scale: 1.0
+
+face:
+  eye_color:
+    r: 0.58
+    g: 0.72
+    b: 0.81
+  eye_scale: 1.1
+  mouth_width_scale: 1.0
+  nose_scale: 0.9
+  skin_color:
+    r: 0.87
+    g: 0.70
+    b: 0.58
+  nail_color:
+    r: 0.75
+    g: 0.60
+    b: 0.55
+  lip_color:
+    r: 0.70
+    g: 0.40
+    b: 0.35
+
+hair:
+  color:
+    r: 0.56
+    g: 0.45
+    b: 0.25
+  length_scale: 1.5
+  physics_enabled: true
+  style_id: curly_long
+
+# Tint blend factor overrides (0=original, 1=full target color)
+tint_blend:
+  skin: 0.6
+  eye: 0.7
+  hair: 0.6
+  nail: 0.5
+  lip: 0.5
+
+# Subsurface scattering for realistic skin
+subsurface_scattering:
+  enabled: true
+  color_r: 0.8
+  color_g: 0.4
+  color_b: 0.25
+
+# LookAt (eye gaze) configuration
+look_at:
+  horizontal_inner_degrees: 15.0
+  horizontal_outer_degrees: 15.0
+  vertical_down_degrees: 10.0
+  vertical_up_degrees: 10.0
+
+# Expression default weights (VRM 0.x compatibility)
+expressions:
+  targets:
+    - name: joy
+      weight: 0.0
+    - name: angry
+      weight: 0.0
+    - name: sorrow
+      weight: 0.0
+    - name: fun
+      weight: 0.0
+    - name: surprise
+      weight: 0.0
+    - name: blink
+      weight: 0.0
+    - name: blink_left
+      weight: 0.0
+    - name: blink_right
+      weight: 0.0
+    - name: neutral
+      weight: 1.0
+    - name: aa
+      weight: 0.0
+    - name: ih
+      weight: 0.0
+    - name: ou
+      weight: 0.0
+    - name: ee
+      weight: 0.0
+    - name: oh
+      weight: 0.0
+
+extensions:
+  runa_identity:
+    age: 19
+    build: feminine, athletic yet soft
+    eye_color: ice-blue
+    full_name: Runa Gridweaver Freyjasdottir
+    hair_style: wild curly blonde, mid-back length
+    height_cm: 172
+    heritage: British-Scandinavian
+    patron_goddess: Freyja
+    skin_tone: golden-tan
+
+metadata:
+  author: Volmarr Wyrd & Runa Gridweaver
+  commercial_use: true
+  contact_url: https://github.com/hrbanazviking
+  license: CC-BY-4.0
+  platform_tags:
+    - vrchat
+    - vtube_studio
+  redistribution: true
+
+outfit:
+  layers:
+    - layer_id: base
+      mesh_id: null
+      primary_color:
+        r: 0.87
+        g: 0.7
+        b: 0.58
+      visible: true
+
+spec_version: "1.0"
