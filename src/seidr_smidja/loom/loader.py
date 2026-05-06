@@ -2,19 +2,27 @@
 
 Loads an AvatarSpec from a YAML/JSON file or a raw dict, validates it fully,
 and returns a typed AvatarSpec. Any failure raises LoomValidationError or LoomIOError.
+
+AUDIT-005 fix: load_spec() now accepts optional annall and session_id parameters
+so the Loom domain logs its own 'loom.validated' event rather than relying on
+the Core (Bridge Core dispatch.py) to log on its behalf — per D-005 Option B.
 """
 from __future__ import annotations
 
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 from pydantic import ValidationError
 
 from seidr_smidja.loom.exceptions import LoomIOError, LoomValidationError, ValidationFailure
 from seidr_smidja.loom.schema import AvatarSpec
+
+if TYPE_CHECKING:
+    # AnnallPort is a Protocol — import only for type checking to avoid circular imports.
+    from seidr_smidja.annall.port import AnnallPort
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +40,24 @@ def _pydantic_errors_to_failures(exc: ValidationError) -> list[ValidationFailure
     return failures
 
 
-def load_spec(source: Path | dict[str, Any]) -> AvatarSpec:
+def load_spec(
+    source: Path | dict[str, Any],
+    annall: AnnallPort | None = None,
+    session_id: str | None = None,
+) -> AvatarSpec:
     """Load and fully validate an AvatarSpec from a file path or raw dict.
 
     This is the primary entry point for the Loom domain.
 
+    AUDIT-005: When annall and session_id are provided, the Loom domain logs its
+    own 'loom.validated' event directly (D-005 Option B). The caller (dispatch.py)
+    must NOT also log 'loom.validated' to avoid duplicate events — see dispatch.py
+    AUDIT-005 comment.
+
     Args:
-        source: A pathlib.Path to a .yaml/.yml/.json file, or a dict of spec data.
+        source:     A pathlib.Path to a .yaml/.yml/.json file, or a dict of spec data.
+        annall:     Optional AnnallPort for structured event logging.
+        session_id: Session ID for the Annáll event. Required if annall is provided.
 
     Returns:
         A fully validated, typed AvatarSpec.
@@ -58,7 +77,24 @@ def load_spec(source: Path | dict[str, Any]) -> AvatarSpec:
             f"load_spec() expects a pathlib.Path or dict, got {type(source).__name__}"
         )
 
-    return _validate(raw)
+    spec = _validate(raw)
+
+    # AUDIT-005: Loom logs its own event when Annáll is injected (Option B).
+    if annall is not None and session_id is not None:
+        try:
+            from seidr_smidja.annall.port import AnnallEvent
+
+            annall.log_event(
+                session_id,
+                AnnallEvent.info(
+                    "loom.validated",
+                    {"avatar_id": spec.avatar_id, "base_asset_id": spec.base_asset_id},
+                ),
+            )
+        except Exception:
+            pass  # Annáll failure must never crash the Loom
+
+    return spec
 
 
 # Keep backwards-compatible alias used in some call sites

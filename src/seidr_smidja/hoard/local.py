@@ -6,17 +6,27 @@ before first run.
 
 Reads catalog from the YAML file at config.hoard.catalog_path.
 Resolves assets from config.hoard.bases_dir.
+
+AUDIT-005 fix: resolve() and list_assets() now accept optional annall and
+session_id parameters so the Hoard domain logs its own 'hoard.resolved' and
+'hoard.listed' events directly (D-005 Option B). The caller (dispatch.py)
+must NOT also log 'hoard.resolved' to avoid duplicate events — see dispatch.py
+AUDIT-005 comment.
 """
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
 from seidr_smidja.hoard.exceptions import AssetNotFoundError, HoardError
 from seidr_smidja.hoard.port import AssetFilter, AssetMeta
+
+if TYPE_CHECKING:
+    # AnnallPort is a Protocol — import only for type checking to avoid circular imports.
+    from seidr_smidja.annall.port import AnnallPort
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +80,22 @@ class LocalHoardAdapter:
                 return entry
         return None
 
-    def resolve(self, asset_id: str) -> Path:
+    def resolve(
+        self,
+        asset_id: str,
+        annall: AnnallPort | None = None,
+        session_id: str | None = None,
+    ) -> Path:
         """Resolve an asset_id to an absolute filesystem path.
+
+        AUDIT-005: When annall and session_id are provided, the Hoard logs its own
+        'hoard.resolved' event (D-005 Option B). The caller must NOT also log this
+        event to avoid duplicates — see dispatch.py AUDIT-005 comment.
+
+        Args:
+            asset_id:   The catalog key to resolve.
+            annall:     Optional AnnallPort for structured event logging.
+            session_id: Session ID for the Annáll event.
 
         Raises:
             AssetNotFoundError: If the asset is not in catalog or file is missing.
@@ -118,10 +142,39 @@ class LocalHoardAdapter:
             )
 
         logger.debug("Hoard resolved '%s' → %s", asset_id, asset_path)
+
+        # AUDIT-005: Hoard logs its own event when Annáll is injected (Option B).
+        if annall is not None and session_id is not None:
+            try:
+                from seidr_smidja.annall.port import AnnallEvent
+
+                annall.log_event(
+                    session_id,
+                    AnnallEvent.info(
+                        "hoard.resolved",
+                        {"asset_id": asset_id, "path": str(asset_path)},
+                    ),
+                )
+            except Exception:
+                pass  # Annáll failure must never crash the Hoard
+
         return asset_path
 
-    def list_assets(self, filter: AssetFilter | None = None) -> list[AssetMeta]:
+    def list_assets(
+        self,
+        filter: AssetFilter | None = None,
+        annall: AnnallPort | None = None,
+        session_id: str | None = None,
+    ) -> list[AssetMeta]:
         """Return metadata for all assets matching the filter.
+
+        AUDIT-005: When annall and session_id are provided, the Hoard logs its own
+        'hoard.listed' event (D-005 Option B).
+
+        Args:
+            filter:     Optional filter criteria.
+            annall:     Optional AnnallPort for structured event logging.
+            session_id: Session ID for the Annáll event.
 
         Raises:
             HoardError: On catalog read failure.
@@ -160,6 +213,22 @@ class LocalHoardAdapter:
                     cached=cached,
                 )
             )
+
+        # AUDIT-005: Hoard logs its own event when Annáll is injected (Option B).
+        if annall is not None and session_id is not None:
+            try:
+                from seidr_smidja.annall.port import AnnallEvent
+
+                annall.log_event(
+                    session_id,
+                    AnnallEvent.info(
+                        "hoard.listed",
+                        {"count": len(results), "filter": str(filter)},
+                    ),
+                )
+            except Exception:
+                pass  # Annáll failure must never crash the Hoard
+
         return results
 
     def catalog_path(self) -> Path:

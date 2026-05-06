@@ -13,6 +13,22 @@ blender:
   executable: "blender"          # Assumes blender is on PATH. Override to an absolute path if needed.
   timeout_seconds: 300           # Maximum seconds per Blender subprocess invocation.
   script_tmp_dir: null           # null = use system temp dir (tempfile.mkdtemp). Override for custom tmp location.
+  # AUDIT-004 fix: platform hint paths moved from _internal/blender_runner.py to here
+  # so they are configurable and satisfy Sacred Law II (no absolute paths hardcoded in Python).
+  # These are checked last in the resolution chain — after env var, config executable, and PATH.
+  # Operators can extend or override this list in config/user.yaml.
+  platform_hints:
+    win32:
+      - "C:\\Program Files\\Blender Foundation\\Blender 4.2\\blender.exe"
+      - "C:\\Program Files\\Blender Foundation\\Blender 4.1\\blender.exe"
+      - "C:\\Program Files\\Blender Foundation\\Blender 4.0\\blender.exe"
+      - "C:\\Program Files\\Blender Foundation\\Blender 3.6\\blender.exe"
+    linux:
+      - "/usr/bin/blender"
+      - "/usr/local/bin/blender"
+    darwin:
+      - "/Applications/Blender.app/Contents/MacOS/Blender"
+      - "/opt/homebrew/bin/blender"
 
 # --- Annáll (Record) ---
 annall:

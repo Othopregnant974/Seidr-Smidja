@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-05-06 — Remediation Pass: Audit Findings AUDIT-004, AUDIT-005, AUDIT-008, AUDIT-009 Closed — 159 Tests Green
+
+*Eldra Járnsdóttir, Forge Worker*
+
+Four code-level findings from AUDIT_GENESIS.md closed additively (no subtractive edits). AUDIT-008 (Gate silently skips four unevaluated compliance rules — `vrchat.polycount`, `vrchat.texture_memory`, `vtube.first_person_bone`, `vtube.eye_bones`): Gate now appends advisory WARNING violations for each unevaluated rule, carrying rule_id, description, and budget/threshold value from YAML; WARNINGs are not counted as failures (passed=False remains false only on ERRORs). AUDIT-005 (Loom and Hoard lacked D-005 Option B Annáll injection): `load_spec()` and `resolve()` / `list_assets()` now accept `annall` and `session_id` parameters and log their own events; Core dispatch no longer double-logs those events. AUDIT-004 (platform hints hardcoded in Python source): hints moved to `config/defaults.yaml` under `blender.platform_hints`; `_PLATFORM_HINTS` constant retained as deprecated fallback for v0.1.x, removed in v0.2. AUDIT-009 (`oracle_eye/scripts/render_avatar.py:125` used `os.path.join`): replaced with `pathlib.Path`. INTERFACE amendment files written for Loom and Hoard. New tests: `tests/_internal/test_blender_runner.py` (5), `tests/gate/test_audit_008_unevaluated_rules.py` (8), `tests/loom/test_audit_005_annall.py` (6), `tests/hoard/test_audit_005_annall.py` (6). `pytest -m "not requires_blender"` → **159 passed**.
+
+---
+
 ## 2026-05-06 — Phase 5 Complete: First Forging — 134 Tests Green
 
 *Eldra Járnsdóttir, Forge Worker*

@@ -113,18 +113,14 @@ def dispatch(
 
     try:
         # ── Step 1: Loom validation ───────────────────────────────────────────
+        # AUDIT-005: Pass annall and session_id so Loom logs its own 'loom.validated'
+        # event directly (D-005 Option B). We no longer log on the Loom's behalf here.
         spec = None
         try:
             from seidr_smidja.loom.loader import load_spec
 
-            spec = load_spec(request.spec_source)
-            annall.log_event(
-                session_id,
-                AnnallEvent.info(
-                    "loom.validated",
-                    {"avatar_id": spec.avatar_id, "base_asset_id": spec.base_asset_id},
-                ),
-            )
+            spec = load_spec(request.spec_source, annall=annall, session_id=session_id)
+            # NOTE: loom.validated event is now emitted by load_spec() itself (AUDIT-005).
         except Exception as exc:
             err = BuildError.from_exception("loom", exc)
             errors.append(err)
@@ -147,17 +143,15 @@ def dispatch(
             )
 
         # ── Step 2: Hoard resolution ──────────────────────────────────────────
+        # AUDIT-005: Pass annall and session_id so Hoard logs its own 'hoard.resolved'
+        # event directly (D-005 Option B). We no longer log on the Hoard's behalf here.
         base_asset_path: Path | None = None
         try:
             resolved_hoard = _get_hoard(hoard, config)
-            base_asset_path = resolved_hoard.resolve(spec.base_asset_id)
-            annall.log_event(
-                session_id,
-                AnnallEvent.info(
-                    "hoard.resolved",
-                    {"asset_id": spec.base_asset_id, "path": str(base_asset_path)},
-                ),
+            base_asset_path = resolved_hoard.resolve(
+                spec.base_asset_id, annall=annall, session_id=session_id
             )
+            # NOTE: hoard.resolved event is now emitted by resolve() itself (AUDIT-005).
         except Exception as exc:
             err = BuildError.from_exception("hoard", exc)
             errors.append(err)

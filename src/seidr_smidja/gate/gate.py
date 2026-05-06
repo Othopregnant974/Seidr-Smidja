@@ -127,6 +127,57 @@ def _check_vrchat(
                 logger.debug(
                     "Gate: polycount check skipped in v0.1 structural mode (budget: %d).", budget
                 )
+                # AUDIT-008 fix: Emit an advisory WARNING so agents are never silently
+                # passed a VRM that might exceed polygon budget.
+                # Design intent: WARNINGs from unevaluated rules do NOT set passed=False
+                # (they are advisories, not hard failures). They appear in the report so
+                # the calling agent can trigger a manual or downstream check.
+                # This satisfies Unbreakable Vow 2's spirit until full glTF mesh
+                # parsing lands in v0.1.1.
+                violations.append(
+                    Violation(
+                        rule_id=rid,
+                        severity=ViolationSeverity.WARNING,
+                        field_path=rule.extra.get("field_path", "mesh.polycount"),
+                        description=(
+                            "Rule not evaluated in v0.1 — manual check required. "
+                            f"Budget for '{tier}' tier: {budget} polygons."
+                        ),
+                        actual_value=None,
+                        limit_value=budget,
+                    )
+                )
+
+        elif rid == "vrchat.texture_memory":
+            budget_mb = tier_budgets.get("texture_memory_mb")
+            # Actual texture memory requires inspecting binary image data.
+            # In v0.1 structural-only mode, we skip this check with an advisory.
+            # TODO(forge-worker): integrate texture size inspection when glTF binary
+            # chunk parsing is available.
+            if budget_mb is not None:
+                logger.debug(
+                    "Gate: texture_memory check skipped in v0.1 structural mode (budget: %d MB).",
+                    budget_mb,
+                )
+            # AUDIT-008 fix: Always emit the advisory WARNING so agents see the
+            # unevaluated rule regardless of whether a tier budget is configured.
+            violations.append(
+                Violation(
+                    rule_id=rid,
+                    severity=ViolationSeverity.WARNING,
+                    field_path=rule.extra.get("field_path", "textures.estimated_memory_mb"),
+                    description=(
+                        "Rule not evaluated in v0.1 — manual check required. "
+                        + (
+                            f"Budget for '{tier}' tier: {budget_mb} MB."
+                            if budget_mb is not None
+                            else "No tier budget configured — check vrchat_rules.yaml."
+                        )
+                    ),
+                    actual_value=None,
+                    limit_value=budget_mb,
+                )
+            )
 
         elif rid == "vrchat.material_count":
             budget = tier_budgets.get("material_count")
@@ -227,6 +278,46 @@ def _check_vtube(
                         limit_value=bone_name,
                     )
                 )
+
+        elif rid == "vtube.first_person_bone":
+            # AUDIT-008 fix: firstPersonBone evaluation requires inspecting the VRM
+            # firstPerson extension field beyond what structural parsing exposes in v0.1.
+            # Emit an advisory WARNING so agents are never silently unaware.
+            # TODO(forge-worker): read firstPerson.firstPersonBone from VRM data when
+            # full firstPerson extraction is implemented.
+            violations.append(
+                Violation(
+                    rule_id=rid,
+                    severity=ViolationSeverity.WARNING,
+                    field_path=rule.extra.get("field_path", "firstPerson.firstPersonBone"),
+                    description=(
+                        "Rule not evaluated in v0.1 — manual check required. "
+                        "Verify that firstPerson.firstPersonBone is set to the head bone."
+                    ),
+                    actual_value=None,
+                    limit_value="head bone",
+                )
+            )
+
+        elif rid == "vtube.eye_bones":
+            # AUDIT-008 fix: eye bone evaluation requires inspecting humanoid bone list
+            # for leftEye / rightEye entries specifically. In v0.1 structural mode we
+            # emit an advisory WARNING instead of silently skipping.
+            # TODO(forge-worker): check bone_names_lower for leftEye/rightEye entries
+            # once the VRM humanoid bone reader fully enumerates all optional bones.
+            violations.append(
+                Violation(
+                    rule_id=rid,
+                    severity=ViolationSeverity.WARNING,
+                    field_path=rule.extra.get("field_path", "humanoid.bones.leftEye"),
+                    description=(
+                        "Rule not evaluated in v0.1 — manual check required. "
+                        "Verify that leftEye and/or rightEye bones are present for eye tracking."
+                    ),
+                    actual_value=None,
+                    limit_value="leftEye or rightEye",
+                )
+            )
 
     passed = not any(v.severity == ViolationSeverity.ERROR for v in violations)
     return TargetResult(

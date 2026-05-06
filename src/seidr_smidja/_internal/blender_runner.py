@@ -27,9 +27,11 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Platform-specific well-known Blender locations.
-# These are checked last in the resolution chain and only provide a hint —
-# the user is always expected to set SEIDR_BLENDER_PATH or config if not on PATH.
+# AUDIT-004: Platform-specific well-known Blender locations have been moved to
+# config/defaults.yaml under blender.platform_hints.
+# This constant is kept as a DEPRECATED fallback for one release cycle (v0.1.x)
+# and will be removed in v0.2 once the config-driven path is proven in production.
+# DO NOT add new paths here — extend config/defaults.yaml instead.
 _PLATFORM_HINTS: dict[str, list[str]] = {
     "win32": [
         r"C:\Program Files\Blender Foundation\Blender 4.2\blender.exe",
@@ -43,6 +45,8 @@ _PLATFORM_HINTS: dict[str, list[str]] = {
         "/opt/homebrew/bin/blender",
     ],
 }
+# DEPRECATED: The above constant will be removed in v0.2.
+# Prefer blender.platform_hints in config/defaults.yaml or config/user.yaml.
 
 
 class BlenderNotFoundError(RuntimeError):
@@ -132,15 +136,30 @@ def resolve_blender_executable(config: dict[str, Any] | None = None) -> Path:
                 logger.debug("Blender resolved via config+PATH: %s", which_result)
                 return Path(which_result)
 
-    # Step 4: Platform-specific hints
+    # Step 4: Platform-specific hints.
+    # AUDIT-004: Read hints from config/defaults.yaml (blender.platform_hints) first.
+    # Falls back to the _PLATFORM_HINTS constant if the config key is absent.
     import sys
 
-    hints = _PLATFORM_HINTS.get(sys.platform, [])
+    config_hints: list[str] = []
+    if config:
+        platform_hints_cfg = config.get("blender", {}).get("platform_hints", {})
+        if isinstance(platform_hints_cfg, dict):
+            config_hints = platform_hints_cfg.get(sys.platform, [])
+
+    # Use config-driven hints if present; otherwise fall back to the deprecated constant.
+    if config_hints:
+        hints = config_hints
+        hint_source = "config"
+    else:
+        hints = _PLATFORM_HINTS.get(sys.platform, [])
+        hint_source = "deprecated-constant"
+
     for hint in hints:
-        checked.append(f"platform-hint:{hint}")
+        checked.append(f"platform-hint({hint_source}):{hint}")
         p = Path(hint)
         if p.is_file():
-            logger.debug("Blender resolved via platform hint: %s", p)
+            logger.debug("Blender resolved via platform hint (%s): %s", hint_source, p)
             return p
 
     raise BlenderNotFoundError(

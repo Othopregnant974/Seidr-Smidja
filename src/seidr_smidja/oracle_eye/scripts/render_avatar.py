@@ -122,7 +122,10 @@ def main() -> int:
     for view_name in views:
         try:
             _setup_camera_for_view(bpy, view_name, avatar_bounds)
-            output_path = os.path.join(output_dir, f"{view_name}.png")
+            # AUDIT-009 fix: use pathlib.Path per ARCHITECTURE.md §VI project standard.
+            # Blender's embedded Python ships pathlib — safe on all supported platforms.
+            from pathlib import Path as _Path
+            output_path = str(_Path(output_dir) / f"{view_name}.png")
             scene.render.filepath = output_path
             bpy.ops.render.render(write_still=True)
             print(f"[render_avatar] Rendered: {view_name} → {output_path}")
