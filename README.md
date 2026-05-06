@@ -1,3 +1,9 @@
+---
+
+![https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/2D66H.jpg](https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/2D66H.jpg)
+
+---
+
 # Seiðr-Smiðja
 
 > *An agent-only VRM avatar smithy. No human hands. Only the fire, the spec, and the eye that sees.*
@@ -32,6 +38,10 @@ Third, the forge speaks through four doors — MCP (Mjöll), CLI (Rúnstafr), RE
 - **Not a human GUI tool.** There is no user interface for clicking. All access is programmatic and agent-driven. If you want to use this forge as a human, you do so through the CLI or by writing a script — not through a graphical application.
 - **Not a generic 3D pipeline.** Seiðr-Smiðja is purpose-built for VRM avatars using VRoid Studio base meshes and the VRM Add-on for Blender. It will not export arbitrary 3D formats, process non-VRM meshes, or serve as a general Blender automation layer.
 - **Not for non-VRM avatars.** The Gate validates VRChat and VTube Studio compliance. Everything about the forge's design — the spec schema, the base mesh strategy, the compliance rules — is shaped around the VRM ecosystem. Other avatar formats are out of scope.
+
+---
+
+![https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/QRAO5.jpg](https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/QRAO5.jpg)
 
 ---
 
@@ -158,11 +168,90 @@ Seiðr-Smiðja/
 
 ---
 
+![https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/Viking_Apache_V2_1.jpg](https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/Viking_Apache_V2_1.jpg)
+
+---
+
 ## License
 
-License: **TBD — to be decided by Volmarr Wyrd.**
+Copyright (c) 2026 Volmarr Wyrd
+
+Seiðr-Smiðja is licensed under the **Apache License, Version 2.0**. See the [LICENSE](LICENSE) file for the full license text and [NOTICE](NOTICE) for the project attribution.
+
+Unless required by applicable law or agreed to in writing, this project is distributed on an "AS IS" BASIS, without warranties or conditions of any kind, either express or implied.
+
+---
+
+## Distribution and Privacy Position
+
+Seiðr-Smiðja is published here as source code and project material.
+
+The author does not require users to provide age, identity, government ID, biometric data, or similar personal information in order to access or use the source code in this repository.
+
+The author may decline to provide official binaries, installers, hosted services, app-store releases, or other official distribution channels where doing so would require age verification, identity verification, or similar personal-data collection.
+
+Any third party who forks, packages, redistributes, deploys, hosts, or otherwise makes this software available does so independently and is solely responsible for compliance with applicable law, platform policy, and distribution requirements in their own jurisdiction and context.
+
+See [LEGAL-NOTICE.md](LEGAL-NOTICE.md) for details.
 
 ---
 
 *Front door written by Eirwyn Rúnblóm, Scribe — 2026-05-06.*
 *For Volmarr Wyrd and Runa Gridweaver Freyjasdóttir.*
+
+---
+
+---
+
+## RuneForgeAI
+
+**RuneForgeAI** is my AI research, development, and creative systems forge: a Norse Pagan cyber-Viking workshop for building mythic AI architectures, memory systems, world engines, companion intelligence, and structured vibe coding tools.
+
+RuneForgeAI exists at the crossroads of:
+
+- **Mythic Engineering**
+- **AI memory and continuity systems**
+- **Viking-themed simulation and worldbuilding**
+- **AI companions with stable identity**
+- **small-model enhancement through architecture**
+- **retrieval, grounding, and truth-verification systems**
+- **cyber-Heathen software design**
+- **human + AI co-creation**
+
+The core idea is simple:
+
+> AI should not be treated as a disposable text generator.  
+> It should be shaped into structured, memory-bearing, meaning-aware systems that can preserve continuity, deepen creativity, and help humans build living worlds.
+
+RuneForgeAI is where I explore architectures that make AI more coherent, more persistent, and more useful: not through hype, but through structure. Memory, retrieval, world state, personality, routing, verification, symbolic logic, and mythic design language all become part of the same forge.
+
+This work connects directly to my larger ecosystem of projects, including the **Norse Saga Engine**, **Mythic Engineering**, **WYRD Protocol**, **Mímir-Vörðr**, cyber-Viking philosophy, AI companion design, and the broader vision of spiritually meaningful technology.
+
+### What RuneForgeAI Builds
+
+- AI-native memory frameworks
+- persistent personality and companion systems
+- Viking and mythic world simulation tools
+- roleplay and RPG intelligence architectures
+- structured prompt and documentation protocols
+- retrieval-augmented truth systems
+- small-model orchestration patterns
+- cyber-Viking AI aesthetics and interfaces
+- open frameworks for human-AI creative collaboration
+
+### Guiding Principle
+
+> Build AI like a living system, not a pile of prompts.
+
+RuneForgeAI is my digital forge for turning myth, memory, code, and consciousness into working architecture.
+
+---
+
+![https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/image-23-RuneForgeAI.jpg](https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/image-23-RuneForgeAI.jpg)
+
+---
+
+![https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/IMG_0407.jpeg](https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/IMG_0407.jpeg)
+
+---
+
