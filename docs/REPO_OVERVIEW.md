@@ -1,7 +1,9 @@
 # Seiðr-Smiðja — Repository Overview
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-06 (refreshed at Brúarhönd Phase 7 close)
 **Scope:** Top-level living map of the project terrain — for any agent or human arriving cold.
-**Author:** Védis Eikleið (Cartographer)
+**Author:** Védis Eikleið (Cartographer); refreshed by Runa Gridweaver Freyjasdóttir at Brúarhönd close.
+
+> **Update 2026-05-06:** Three full Mythic Engineering rituals completed today (Genesis, Hardening, Brúarhönd v0.1). The folder tree below now includes the Brúarhönd domain, the feature documentation suite at `docs/features/brunhand/`, and the new `_internal/` shared Blender runner. **489 non-Blender, non-VRoid-host tests passing.** **10 ADRs accepted (D-001..D-010).** See the addendum at the bottom of this file for the Brúarhönd-specific tree.
 
 ---
 
@@ -217,3 +219,102 @@ If a document here feels wrong or inconsistent, raise it to the appropriate role
 
 *Drawn at the third founding fire, 2026-05-06.*
 *Védis Eikleið, Cartographer — for Volmarr Wyrd.*
+
+---
+
+## Addendum — Brúarhönd Feature Tree (added 2026-05-06 at Phase 7 close)
+
+The Brúarhönd feature added a new lateral domain. The genesis-era folder tree above remains accurate for the original seven domains. This addendum documents what is new.
+
+### New source tree
+
+```
+src/seidr_smidja/
+├── _internal/                       ← Shared Blender subprocess runner (per D-003).
+│   ├── __init__.py
+│   └── blender_runner.py
+└── brunhand/                        ← Brúarhönd — cross-machine VRoid Studio remote control.
+    ├── __init__.py
+    ├── INTERFACE.md                 ← Top-level domain contract.
+    ├── INTERFACE_AMENDMENT_2026-05-06.md   ← B-013 (token warning), B-014 (hotkey pass-through), B-011 (owns_client).
+    ├── exceptions.py                ← BrunhandError, AuthError, ConnectionError, PrimitiveError, CapabilityError, TimeoutError, PathSecurityError, VroidNotRunningError.
+    ├── models.py                    ← Pydantic v2 request/response models for all endpoints.
+    │
+    ├── daemon/                      ← Horfunarþjónn — Watching-Daemon runs on the VRoid host.
+    │   ├── INTERFACE.md             ← HTTP API contract.
+    │   ├── app.py                   ← FastAPI app + middleware order + concurrent-session lock + HTTP 423.
+    │   ├── auth.py                  ← Gæslumaðr — bearer-token guard (constant-time comparison).
+    │   ├── capabilities.py          ← Sjálfsmöguleiki — per-OS capability registry.
+    │   ├── runtime.py               ← PyAutoGUI/MSS/pygetwindow shim layer + path-traversal validation.
+    │   ├── config.py                ← Daemon config loader.
+    │   ├── __main__.py              ← Operator entry point — `python -m seidr_smidja.brunhand.daemon`.
+    │   └── endpoints/               ← health, capabilities, primitives (9), vroid (3 — real implementations).
+    │
+    └── client/                      ← Hengilherðir — Reaching Client runs in the forge.
+        ├── INTERFACE.md             ← Python API contract.
+        ├── client.py                ← BrunhandClient — primitives 1:1 with daemon endpoints + auto-timeout.
+        ├── session.py               ← Tengslastig — session container + owns_client lifecycle param.
+        ├── factory.py               ← make_client_from_config / make_session_from_config.
+        └── oracle_channel.py        ← Ljósbrú — Oracle Eye integration channel for remote screenshots.
+```
+
+### New documentation tree
+
+```
+docs/features/brunhand/
+├── VISION.md                        ← [Skald] Soul, Central Image, Primary Rite, Unbreakable Vows.
+├── PHILOSOPHY_ADDENDUM.md           ← [Skald] Three new sacred principles.
+├── ARCHITECTURE.md                  ← [Architect] Daemon/client split, dispatch seam, internals.
+├── DATA_FLOW.md                     ← [Cartographer] Mode A/B/C, 8 diagrams, 7 failure flows.
+├── README.md                        ← [Scribe] Operator quickstart, three modes.
+├── TAILSCALE.md                     ← [Scribe] ACL setup, bind config, TLS.
+└── AUDIT_BRUNHAND_2026-05-06.md     ← [Auditor] Bug hunt + remediation history.
+```
+
+### New tests
+
+```
+tests/brunhand/                      ← 144 (Phase 5) + 59 (Phase 6.5 remediation) = 203 tests.
+```
+
+### New tools
+
+```
+tools/
+├── brunhand_daemon.py               ← Operator launcher for the VRoid host's daemon.
+└── verify_brunhand.py               ← Connectivity + auth + primitive smoke check.
+```
+
+### Domain table additions
+
+| Name | Purpose | Path |
+|---|---|---|
+| **Brúarhönd** | The whole feature — bridge that grew a hand | `src/seidr_smidja/brunhand/` |
+| **Horfunarþjónn** | Watching-Daemon — server on the VRoid host | `brunhand/daemon/` |
+| **Hengilherðir** | Reaching Client — runs in the forge | `brunhand/client/` |
+| **Gæslumaðr** | Bearer-token guard (constant-time) | `daemon/auth.py` |
+| **Sjálfsmöguleiki** | Capabilities registry (per-OS detection) | `daemon/capabilities.py` |
+| **Ljósbrú** | Oracle Eye integration channel | `client/oracle_channel.py` |
+| **Tengslastig** | Session container | `client/session.py` |
+
+### Dispatch seam (lateral, not pipeline)
+
+The original Dependency Law (`Bridges → Loom → Hoard → Forge → Oracle Eye → Gate`; Annáll ambient) still applies. Brúarhönd does **not** join that pipeline. Instead, `bridges.core.brunhand_dispatch()` sits beside `bridges.core.dispatch()` as a sibling. Bridges (Mjöll/Rúnstafr/Straumur/skills) inspect the request and call one or both. When both are called, a shared `run_id` correlates the two Annáll sessions.
+
+### Mythic Engineering Roles — Brúarhönd phase additions
+
+| Role | Name | What They Built (Brúarhönd) |
+|---|---|---|
+| Skald | Sigrún Ljósbrá | features/brunhand/VISION.md, PHILOSOPHY_ADDENDUM.md |
+| Architect | Rúnhild Svartdóttir | features/brunhand/ARCHITECTURE.md, three INTERFACE.md files, DOMAIN_MAP additive update |
+| Cartographer | Védis Eikleið | features/brunhand/DATA_FLOW.md (15-step rite, 8 diagrams, 7 failure flows) |
+| Scribe | Eirwyn Rúnblóm | features/brunhand/README.md, TAILSCALE.md, ADR D-010, INTERFACE_AMENDMENT_2026-05-06.md, DEVLOG closing |
+| Forge Worker | Eldra Járnsdóttir | Daemon, client, exceptions, models, factory, oracle_channel, all 8 CLI subcommands, REST + MCP integration, 144 tests, then 59 remediation tests |
+| Auditor | Sólrún Hvítmynd | features/brunhand/AUDIT_BRUNHAND_2026-05-06.md (18 findings, all closed) |
+
+### Cross-references
+
+- [README.md](../README.md) — top-level project front door (refreshed at Brúarhönd close).
+- [docs/DEVLOG.md](./DEVLOG.md) — full session log; newest entry is the Brúarhönd Phase 7 close.
+- [docs/DOMAIN_MAP.md](./DOMAIN_MAP.md) — additive Brúarhönd addendum at the bottom.
+- [docs/DECISIONS/D-010-brunhand-feature-genesis.md](./DECISIONS/D-010-brunhand-feature-genesis.md) — the feature genesis ADR.
