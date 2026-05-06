@@ -1,139 +1,139 @@
-# 🧿 Seiðr-Smiðja — Mystic Engineering Repair Plan
+# 🧿 Seiðr-Smiðja — Mythic Engineering Repair Plan
 
 **Date:** 2026-05-06  
 **Architect:** Volmarr Wyrd  
 **Weaver:** Runa Gridweaver Freyjasdottir  
-**Model:** DeepSeek V4 Pro (opencode-go) — chosen for deep code comprehension + long context
+**Framework:** Mythic Engineering — https://github.com/hrabanazviking/Mythic-Engineering  
+**Model:** DeepSeek V4 Pro (opencode-go) — deep code comprehension, 128K context
 
 ---
 
-## The Six Mystic Sub-Agents
+## Vision Statement (from the Skald)
 
-Each agent is a Nornir-sphere — a domain of responsibility carved from the Wyrd.
-They work in phase order: foundation first, then expression, then optimization, then crossing.
-
-### 🦴 1. HUGINN — Bone Architecture (Thought)
-*The Raven of Bone-Mapping — fixes what supports all else*
-
-**Domain:** D-018 — Correct VRM humanoid bone mapping via PropertyGroup API  
-**Phase:** 1 (Foundation — must complete first)  
-**Task:** Read VRM Add-on `property_group.py` and `human_bone.py` source. Find the correct API for 
-setting individual bone properties on the `Vrm1HumanBonesPropertyGroup`. Rewrite 
-`_map_vrm_human_bones()` in `build_avatar.py` to map all 55 VRM humanoid bone slots 
-using the correct CollectionProperty/dict access pattern. Test that bone assignments 
-survive the migration pass.
-
-**Files:** `build_avatar.py`, `~/.config/blender/3.4/scripts/addons/io_scene_vrm/editor/vrm1/property_group.py`, 
-`~/.config/blender/3.4/scripts/addons/io_scene_vrm/common/vrm1/human_bone.py`
+*Seiðr-Smiðja is an agent-only VRM avatar smithy — a headless programmatic forge  
+where AI minds weave digital bodies from pure intent and structured code.  
+It shall produce VRChat-ready avatars that pass Gate compliance,  
+with the soul of a Norse longhouse and the precision of a rune-carved blade.*
 
 ---
 
-### 👁️ 2. MUNINN — Memory & Migration (Recall)
-*The Raven of Configuration — fixes what remembers and what forgets*
+## The Six Mythic Roles Applied to Seiðr-Smiðja
 
-**Domain:** D-019 + D-020 — lookAt enum case fix + migration structure search suppression  
-**Phase:** 1 (Foundation — parallel with Huginn)  
-**Task:** 
-- Fix `lookAt.type = "BONE"` → `"bone"` (lowercase VRM 1.0 enum)
-- Patch `migration.py` to skip `update_all_bone_name_candidates()` when bones are already manually assigned 
-  (check `bones_are_correctly_assigned()` before running structure search)
-- Or: find a way to set the addon migration version high enough that the migration path skips entirely
-
-**Files:** `build_avatar.py`, `~/.config/blender/3.4/scripts/addons/io_scene_vrm/editor/vrm1/migration.py`
+Each of the six ME roles becomes a sub-agent, assigned a phase of work.
+Sub-agents use the role persona as their operating identity.
 
 ---
 
-### 🎭 3. FREYJA'S MASK — Expression & Viseme (Seiðr)
-*The Lady of Lip and Eye — gives the avatar voice and feeling*
+### Phase 1 — Foundation (PARALLEL)
 
-**Domain:** All 15 VRChat visemes + 6 remaining expression presets  
-**Phase:** 2 (Expression — after Huginn completes)  
-**Task:**
-- Map all 15 VRChat viseme shape keys (aa, ih, ou, ee, oh, PP, FF, TH, DD, kk, CH, SS, nn, RR, E) 
-  to TurboSquid model shape keys
-- Add 6 remaining expression presets: neutral, lookUp, lookDown, lookLeft, lookRight
-- For visemes not directly present in TurboSquid model, create blend shape proxies from 
-  existing mouth/jaw shape keys
-- Right-side symmetry for all bilateral expressions
+#### 🏗️ THE ARCHITECT — Rúnhild Svartdóttir
+**Domain:** D-018 — Bone PropertyGroup API + humanoid mapping  
+**Task:** Structure the bone mapping correctly. Read the VRM Add-on source, find the correct API for `Vrm1HumanBonesPropertyGroup`, redesign `_map_vrm_human_bones()` in `build_avatar.py` with proper CollectionProperty/dict access. Map all 55 VRM bone slots. Define the invariant: *all 15 required bones must survive migration*.
 
-**Files:** `build_avatar.py`, `examples/spec_runa_gridweaver.yaml`
+**Files:**
+- `~/Seidr-Smidja/src/seidr_smidja/forge/scripts/build_avatar.py`
+- `~/.config/blender/3.4/scripts/addons/io_scene_vrm/editor/vrm1/property_group.py`
+- `~/.config/blender/3.4/scripts/addons/io_scene_vrm/common/vrm1/human_bone.py`
+- `~/.config/blender/3.4/scripts/addons/io_scene_vrm/editor/vrm1/migration.py`
 
 ---
 
-### 🔨 4. SINDRI'S FORGE — Material Transmutation (Smiðr)
-*The Dwarf-Smith of Optimization — reduces, refines, hardens*
+#### 🗺️ THE CARTOGRAPHER — Védis Eikleið
+**Domain:** D-019 + D-020 — lookAt enum fix + migration flow mapping  
+**Task:** Map the full export pipeline flow, identify where `lookAt.type = "BONE"` fails (needs lowercase `"bone"`), and trace the migration path to find where `update_all_bone_name_candidates()` is called. Design a guard that suppresses structure search when bones are already correctly assigned. Update `DATA_FLOW.md` with the VRM export pipeline map.
 
-**Domain:** Material merging (21→8) + texture optimization (143MB→<75MB)  
-**Phase:** 3 (Optimization — after Phase 2 completes)  
-**Task:**
-- Analyze 21 TurboSquid materials, design merge strategy: combine similar materials 
-  (all skin variants → 1, all eye materials → 1, etc.)
-- Create material atlas script: merge textures into atlases where appropriate
-- Downsample textures: 4K→2K for body, 2K→1K for details
-- Target: ≤8 material slots, ≤75MB total texture memory
-- Update VRM material properties for each merged material
-
-**Files:** `build_avatar.py`, `tint_textures.py`, `examples/spec_runa_gridweaver.yaml`
+**Files:**
+- `~/Seidr-Smidja/src/seidr_smidja/forge/scripts/build_avatar.py`
+- `~/.config/blender/3.4/scripts/addons/io_scene_vrm/editor/vrm1/migration.py`
+- `~/.config/blender/3.4/scripts/addons/io_scene_vrm/exporter/export_scene.py`
+- `~/Seidr-Smidja/docs/DATA_FLOW.md`
 
 ---
 
-### 🌾 5. SIF'S CROWN — Hair & Adornment (Gullveig)
-*Golden-Haired — weaves the crowning glory*
+### Phase 2 — Expression (AFTER Phase 1)
 
+#### 🎭 THE SKALD — Sigrún Ljósbrá
+**Domain:** 15 VRChat visemes + 6 remaining expression presets  
+**Task:** Give the avatar voice and feeling. Map all 15 VRChat viseme shape keys to TurboSquid model equivalents. For visemes not directly present, design blend proxies from existing mouth/jaw shape keys. Name and frame each expression with mythic precision. Add 6 remaining presets (neutral, lookUp/Down/Left/Right). Right-side symmetry.
+
+**Files:**
+- `~/Seidr-Smidja/src/seidr_smidja/forge/scripts/build_avatar.py`
+- `~/Seidr-Smidja/examples/spec_runa_gridweaver.yaml`
+
+---
+
+### Phase 3 — Optimization (AFTER Phase 2)
+
+#### 🔨 THE FORGE WORKER — Eldra Járnsdóttir
+**Domain:** Material merge (21→8) + texture optimization (143MB→<75MB)  
+**Task:** Hard practical work. Merge similar materials, create texture atlases, downsample 4K→2K. Reduce material count to ≤8 for VRChat Good tier. Optimize texture memory to ≤75MB. Make the forge output compact and efficient.
+
+**Files:**
+- `~/Seidr-Smidja/src/seidr_smidja/forge/scripts/build_avatar.py`
+- `~/Seidr-Smidja/src/seidr_smidja/forge/scripts/tint_textures.py`
+- `~/Seidr-Smidja/examples/spec_runa_gridweaver.yaml`
+
+---
+
+### Phase 4 — Adornment (AFTER Phase 3)
+
+#### ✨ THE SKALD — Sigrún Ljósbrá (re-invoked for aesthetic vision)
 **Domain:** Hair geometry + 7 outfit variants  
-**Phase:** 4 (Adornment — after Phase 3)  
-**Task:**
-- Build hair mesh from code: card/strip geometry with UV mapping for hair texture
-- Create hair shader (blonde HSV target: hue=0.108, saturation=0.554, value=0.56)
-- Define 7 outfit variant system in spec YAML: nude, casual, formal, ritual, battle, swim, sleep
-- Each variant specifies: material overrides, geometry masks, bone group enables
-- Hair must deform with head bone in the armature
+**Task:** Weave the crowning glory — hair mesh from code (card/strip geometry, UV mapping, blonde shader). Name and design 7 outfit variants (nude, casual, formal, ritual, battle, swim, sleep) in the spec YAML. Each variant is a constellation of material overrides, geometry masks, and bone group enables.
 
-**Files:** `build_avatar.py`, `examples/spec_runa_gridweaver.yaml`
+**Files:**
+- `~/Seidr-Smidja/src/seidr_smidja/forge/scripts/build_avatar.py`
+- `~/Seidr-Smidja/examples/spec_runa_gridweaver.yaml`
 
 ---
 
-### 🌉 6. HEIMDALLR'S GATE — Bridging & Validation (Bifröst)
-*The Watchman — ensures the crossing is clean and lawful*
+### Phase 5 — Crossing (AFTER Phase 4)
 
+#### 🔍 THE AUDITOR — Sólrún Hvítmynd
 **Domain:** Final VRM 1.0 export + Gate compliance + VRChat readiness  
-**Phase:** 5 (Crossing — after all others)  
-**Task:**
-- Execute full build with all Phase 1-4 fixes applied
-- Run `seidr inspect` on the exported VRM
-- Fix any remaining compliance violations
-- Verify all 15 required bones are mapped
-- Verify all 15 visemes present
-- Verify material count ≤8
-- Verify texture budget ≤75MB
-- Verify lookAt configuration valid
-- Final `git push` to development branch
+**Task:** Cold, merciless verification. Execute full build. Run `seidr inspect`. Expose every violation. Verify: 15+ required bones mapped, 15 visemes present, material count ≤8, texture budget ≤75MB, lookAt valid. No self-deception. If anything fails, report exactly what and why.
 
-**Files:** `build_avatar.py`, all spec files, Gate compliance rules
+**Files:** All project files
 
 ---
 
-## Phase Execution Order
+### Phase 6 — Preservation (AFTER Phase 5)
+
+#### 📜 THE SCRIBE — Eirwyn Rúnblóm
+**Domain:** Documentation, changelog, DEVLOG, git push  
+**Task:** Record everything. Update DEVLOG.md, DOMAIN_MAP.md, ARCHITECTURE.md. Write CHANGELOG entry. Ensure no documentation drift. Push to development branch. Preserve continuity for the next session.
+
+**Files:** All docs in `~/Seidr-Smidja/docs/`
+
+---
+
+## Execution Order
 
 ```
-Phase 1 (Foundation)  ──┬── Huginn (Bone Architecture)
-                         └── Muninn (Config & Migration)     ← PARALLEL
-                                    │
-Phase 2 (Expression)  ──── Freyja's Mask (Visemes)          ← AFTER Phase 1
-                                    │
-Phase 3 (Optimization) ──── Sindri's Forge (Materials)       ← AFTER Phase 2
-                                    │
-Phase 4 (Adornment)   ──── Sif's Crown (Hair & Outfits)     ← AFTER Phase 3
-                                    │
-Phase 5 (Crossing)     ──── Heimdallr's Gate (Validation)    ← AFTER Phase 4
+Phase 1 (Foundation)    ──┬── Architect (Bone Structure)
+                           └── Cartographer (Pipeline Map + Migration)    ← PARALLEL
+                                      │
+Phase 2 (Expression)    ──── Skald (Visemes & Expressions)               ← AFTER Phase 1
+                                      │
+Phase 3 (Optimization)  ──── Forge Worker (Materials & Textures)        ← AFTER Phase 2
+                                      │
+Phase 4 (Adornment)     ──── Skald (Hair & Outfits)                      ← AFTER Phase 3
+                                      │
+Phase 5 (Verification)  ──── Auditor (Compliance Check)                  ← AFTER Phase 4
+                                      │
+Phase 6 (Preservation)  ──── Scribe (Documentation & Push)              ← AFTER Phase 5
 ```
 
-## Chosen Model: DeepSeek V4 Pro (opencode-go)
+## Sub-Agent Model
 
-**Why:** DeepSeek V4 Pro has excellent code comprehension, long context window (128K), 
-strong Python/Blender API understanding, and is available on the builder list. It excels 
-at reading large codebases and producing correct patches — exactly what Mystic Engineering 
-sub-agents need.
+Each sub-agent delegates via `delegate_task` with model override:
+```yaml
+model:
+  provider: opencode-go
+  model: deepseek-v4-pro
+```
+
+The role persona prompt is injected into the `context` field.
 
 ---
 
@@ -150,8 +150,9 @@ sub-agents need.
 | Gate compliance | FAIL (11 errors) | PASS |
 | Structure search pollution | YES | Suppressed |
 | VRM export status | CANCELLED | SUCCESS |
+| Docs updated | Partial | Full (DEVLOG + DOMAIN_MAP + ARCHITECTURE) |
 
 ---
 
-*Carved in runes by Runa Gridweaver, under the watch of the Nornir.*
-*The Wyrd is woven — the threads shall hold.*
+*Carved in runes by Runa Gridweaver, under the Six Roles of Mythic Engineering.*
+*The Wyrd is woven — each thread in its proper hand.*
