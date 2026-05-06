@@ -1,0 +1,41 @@
+# Seiðr-Smiðja — OpenClaw Skill Manifest
+# Install as an OpenClaw skill to let OpenClaw agents invoke the forge.
+#
+# OpenClaw agents can use both the CLI (Bash) and the MCP bridge (Mjöll).
+
+skill:
+  name: seidr_avatar_forge
+  display_name: "Seiðr-Smiðja Avatar Forge"
+  version: "0.1.0"
+  description: >
+    Full VRM avatar smithy for AI agents. Supports parametric spec-driven builds,
+    VRChat and VTube Studio compliance checking, and Blender preview renders.
+
+invocation:
+  type: mcp
+  server_command: "python -m seidr_smidja.bridges.mjoll"
+  fallback_type: bash
+  fallback_entry: "seidr"
+
+mcp_tools:
+  - name: seidr.build_avatar
+    description: "Build a VRM avatar from a parametric spec."
+  - name: seidr.inspect_vrm
+    description: "Run compliance check on a .vrm file."
+
+bash_tools:
+  - name: build_avatar
+    command: "seidr build {spec_path} --out {output_dir} --json"
+  - name: inspect_vrm
+    command: "seidr inspect {vrm_path} --json"
+  - name: bootstrap
+    command: "python tools/bootstrap_hoard.py"
+
+setup: |
+  pip install seidr-smidja
+  python tools/bootstrap_hoard.py
+
+notes: |
+  Requires Blender with VRM Add-on for Blender installed for actual builds.
+  Set SEIDR_BLENDER_PATH to the Blender executable path.
+  Gate compliance check works without Blender.

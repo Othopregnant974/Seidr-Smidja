@@ -1,0 +1,181 @@
+"""seidr_smidja.hoard.local — LocalHoardAdapter
+
+D-004: In v0.1, the Hoard is local-only. Assets must be present in the
+configured bases_dir. No network calls. Use bootstrap_hoard.py to seed assets
+before first run.
+
+Reads catalog from the YAML file at config.hoard.catalog_path.
+Resolves assets from config.hoard.bases_dir.
+"""
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from seidr_smidja.hoard.exceptions import AssetNotFoundError, HoardError
+from seidr_smidja.hoard.port import AssetFilter, AssetMeta
+
+logger = logging.getLogger(__name__)
+
+
+class LocalHoardAdapter:
+    """Resolves Hoard assets from a local catalog and bases directory.
+
+    Args:
+        catalog_path: Path to the catalog.yaml file.
+        bases_dir:    Directory containing base .vrm files (e.g., data/hoard/bases/).
+
+    The catalog file lists available assets; the bases_dir contains the actual files.
+    Paths in the catalog are relative to bases_dir.
+    """
+
+    def __init__(self, catalog_path: Path, bases_dir: Path) -> None:
+        self._catalog_path = catalog_path
+        self._bases_dir = bases_dir
+        self._catalog: list[dict[str, Any]] = []
+        self._loaded = False
+
+    def _load_catalog(self) -> None:
+        """Load the catalog YAML (lazy load on first access)."""
+        if self._loaded:
+            return
+        try:
+            with self._catalog_path.open("r", encoding="utf-8") as fh:
+                data = yaml.safe_load(fh)
+            if not isinstance(data, dict):
+                raise HoardError(f"Catalog file {self._catalog_path} is not a YAML mapping.")
+            self._catalog = data.get("bases", [])
+            self._loaded = True
+            logger.debug(
+                "Hoard catalog loaded: %d assets from %s",
+                len(self._catalog),
+                self._catalog_path,
+            )
+        except FileNotFoundError as exc:
+            raise HoardError(
+                f"Hoard catalog not found at {self._catalog_path}. "
+                "Run 'python tools/bootstrap_hoard.py' to seed assets."
+            ) from exc
+        except Exception as exc:
+            raise HoardError(f"Failed to load Hoard catalog: {exc}") from exc
+
+    def _find_entry(self, asset_id: str) -> dict[str, Any] | None:
+        """Look up a catalog entry by asset_id."""
+        self._load_catalog()
+        for entry in self._catalog:
+            if entry.get("asset_id") == asset_id:
+                return entry
+        return None
+
+    def resolve(self, asset_id: str) -> Path:
+        """Resolve an asset_id to an absolute filesystem path.
+
+        Raises:
+            AssetNotFoundError: If the asset is not in catalog or file is missing.
+            HoardError:         On catalog read failure.
+        """
+        entry = self._find_entry(asset_id)
+        if entry is None:
+            raise AssetNotFoundError(
+                asset_id=asset_id,
+                message=(
+                    f"Asset '{asset_id}' not found in Hoard catalog at "
+                    f"{self._catalog_path}. "
+                    "Run 'python tools/bootstrap_hoard.py' to download available assets, "
+                    "or check the catalog for valid asset_id values."
+                ),
+            )
+
+        filename = entry.get("filename")
+        if not filename:
+            raise AssetNotFoundError(
+                asset_id=asset_id,
+                message=f"Catalog entry for '{asset_id}' is missing 'filename' field.",
+            )
+
+        asset_path = (self._bases_dir / filename).resolve()
+
+        if not asset_path.exists():
+            cached = entry.get("cached", False)
+            if not cached:
+                raise AssetNotFoundError(
+                    asset_id=asset_id,
+                    message=(
+                        f"Asset '{asset_id}' is in the catalog but not cached locally. "
+                        f"Expected path: {asset_path}. "
+                        "Run 'python tools/bootstrap_hoard.py' to download it."
+                    ),
+                )
+            raise AssetNotFoundError(
+                asset_id=asset_id,
+                message=(
+                    f"Asset '{asset_id}' is marked as cached but the file is missing: "
+                    f"{asset_path}. The catalog may be out of sync — re-run bootstrap."
+                ),
+            )
+
+        logger.debug("Hoard resolved '%s' → %s", asset_id, asset_path)
+        return asset_path
+
+    def list_assets(self, filter: AssetFilter | None = None) -> list[AssetMeta]:
+        """Return metadata for all assets matching the filter.
+
+        Raises:
+            HoardError: On catalog read failure.
+        """
+        self._load_catalog()
+        results: list[AssetMeta] = []
+        for entry in self._catalog:
+            aid = entry.get("asset_id", "")
+            tags = entry.get("tags", [])
+            asset_type = "vrm_base"  # All catalog entries in v0.1 are VRM bases
+
+            # Apply filters
+            if filter is not None:
+                if filter.asset_type and asset_type != filter.asset_type:
+                    continue
+                if filter.tags:
+                    # All requested tags must be present
+                    if not all(t in tags for t in filter.tags):
+                        continue
+
+            # Determine if locally cached
+            filename = entry.get("filename")
+            cached = False
+            if filename:
+                path = self._bases_dir / filename
+                cached = path.exists()
+
+            results.append(
+                AssetMeta(
+                    asset_id=aid,
+                    display_name=entry.get("display_name", aid),
+                    asset_type=asset_type,
+                    tags=tags,
+                    vrm_version=entry.get("vrm_version", "unknown"),
+                    file_size_bytes=entry.get("file_size_bytes"),
+                    cached=cached,
+                )
+            )
+        return results
+
+    def catalog_path(self) -> Path:
+        """Return the path to the catalog YAML file."""
+        return self._catalog_path
+
+    @classmethod
+    def from_config(cls, config: dict[str, Any], project_root: Path | None = None) -> LocalHoardAdapter:
+        """Construct from a resolved config dict.
+
+        Args:
+            config:       The config dict from seidr_smidja.config.load_config().
+            project_root: Optional root for resolving relative paths.
+        """
+        root = project_root or Path(".")
+        hoard_cfg = config.get("hoard", {})
+        catalog_path = (root / Path(hoard_cfg.get("catalog_path", "data/hoard/catalog.yaml"))).resolve()
+        bases_dir = (root / Path(hoard_cfg.get("bases_dir", "data/hoard/bases"))).resolve()
+        return cls(catalog_path=catalog_path, bases_dir=bases_dir)

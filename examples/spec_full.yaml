@@ -1,0 +1,85 @@
+# Seiðr-Smiðja — Full Avatar Spec
+# All supported v0.1 fields with annotated values.
+# Use this as a reference when crafting specs from scratch.
+
+spec_version: "1.0"
+avatar_id: "my_full_avatar_v1"
+display_name: "My Full Avatar"
+
+# Which base mesh to start from. See 'seidr list-assets' for available IDs.
+base_asset_id: "vroid/sample_a"
+
+# ── Body proportions ─────────────────────────────────────────────────────────
+# All scale values are relative multipliers: 1.0 = base mesh default.
+# Range: 0.5 (smallest) → 2.0 (largest).
+body:
+  height_scale: 1.05       # Slightly taller than base
+  head_scale: 1.0          # Default head-to-body ratio
+  upper_body_scale: 1.0    # Torso width/depth
+  lower_body_scale: 0.98   # Hip/leg proportions
+  arm_length_scale: 1.02   # Slightly longer arms
+  leg_length_scale: 1.05   # Slightly longer legs
+
+# ── Face ─────────────────────────────────────────────────────────────────────
+face:
+  eye_color:               # RGB normalized [0.0–1.0]
+    r: 0.1
+    g: 0.7
+    b: 0.9
+  eye_scale: 1.1           # Slightly larger eyes
+  nose_scale: 0.9          # Slightly smaller nose
+  mouth_width_scale: 1.0   # Default mouth width
+  skin_color:              # Tint applied to skin material
+    r: 1.0
+    g: 0.88
+    b: 0.79
+
+# ── Hair ─────────────────────────────────────────────────────────────────────
+hair:
+  color:                   # Hair base color
+    r: 0.95
+    g: 0.95
+    b: 1.0
+  style_id: null           # null = use base mesh default hair style
+  length_scale: 1.5        # 50% longer than default
+  physics_enabled: true    # Keep spring-bone hair physics
+
+# ── Outfit ───────────────────────────────────────────────────────────────────
+outfit:
+  layers:
+    - layer_id: "top"
+      mesh_id: null        # null = use base mesh default top
+      primary_color:
+        r: 0.2
+        g: 0.2
+        b: 0.4
+      secondary_color: null
+      visible: true
+
+# ── Expressions ──────────────────────────────────────────────────────────────
+# Set default blend weights for expression targets.
+# 0.0 = fully off; 1.0 = fully on.
+expressions:
+  targets:
+    - name: "joy"
+      weight: 0.0
+    - name: "blink"
+      weight: 0.0
+
+# ── Metadata ─────────────────────────────────────────────────────────────────
+metadata:
+  author: "My Agent"
+  license: "CC-BY-4.0"
+  contact_url: "https://example.com"
+  commercial_use: false
+  redistribution: true
+  platform_tags:
+    - "vrchat"
+    - "vtube_studio"
+
+# ── Extensions ───────────────────────────────────────────────────────────────
+# The extensions hatch is opaque to the Loom.
+# Use it for consumer-specific data: NorseSagaEngine, VGSK, etc.
+extensions:
+  nse:
+    bondmaid_id: "astrid"

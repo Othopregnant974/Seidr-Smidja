@@ -115,7 +115,7 @@ Thin vertical slice end-to-end:
 | 2 — Bones | Architect | PENDING | — |
 | 3 — Rivers | Cartographer | PENDING | — |
 | 4 — Memory | Scribe | PENDING | — |
-| 5 — First Forging | Forge Worker | PENDING | — |
+| 5 — First Forging | Forge Worker | COMPLETE — 134 tests green 2026-05-06 | pending commit |
 | 6 — Verification | Auditor | PENDING | — |
 | 7 — Closing | Scribe | PENDING | — |
 

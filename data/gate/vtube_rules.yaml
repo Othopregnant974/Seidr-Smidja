@@ -1,0 +1,96 @@
+# VTube Studio Compliance Rules for Seiðr-Smidja
+# Source: VTube Studio documentation and VRM specification (as of 2024)
+# All rules loaded at runtime — never hardcoded in Python (Sacred Law I).
+
+target: VTUBE_STUDIO
+display_name: "VTube Studio Avatar Compliance"
+
+rules:
+
+  - rule_id: "vtube.vrm_version"
+    display_name: "VRM Version Compatibility"
+    severity: ERROR
+    description: >
+      VTube Studio accepts VRM 0.x and VRM 1.0 format files.
+      The avatar must declare a valid VRM spec version.
+    accepted_versions:
+      - "0.0"
+      - "1.0"
+    field_path: "vrm.specVersion"
+
+  - rule_id: "vtube.expression.joy"
+    display_name: "Expression: Joy Present"
+    severity: ERROR
+    description: "VTube Studio requires the 'Joy' expression blendshape preset."
+    field_path: "blendShapeGroups.Joy"
+
+  - rule_id: "vtube.expression.angry"
+    display_name: "Expression: Angry Present"
+    severity: ERROR
+    description: "VTube Studio requires the 'Angry' expression blendshape preset."
+    field_path: "blendShapeGroups.Angry"
+
+  - rule_id: "vtube.expression.sorrow"
+    display_name: "Expression: Sorrow Present"
+    severity: ERROR
+    description: "VTube Studio requires the 'Sorrow' expression blendshape preset."
+    field_path: "blendShapeGroups.Sorrow"
+
+  - rule_id: "vtube.expression.fun"
+    display_name: "Expression: Fun Present"
+    severity: ERROR
+    description: "VTube Studio requires the 'Fun' expression blendshape preset."
+    field_path: "blendShapeGroups.Fun"
+
+  - rule_id: "vtube.expression.surprised"
+    display_name: "Expression: Surprised Present"
+    severity: WARNING
+    description: "VTube Studio benefits from the 'Surprised' expression preset for face tracking."
+    field_path: "blendShapeGroups.Surprised"
+
+  - rule_id: "vtube.expression.neutral"
+    display_name: "Expression: Neutral Present"
+    severity: WARNING
+    description: "VTube Studio benefits from the 'Neutral' expression preset."
+    field_path: "blendShapeGroups.Neutral"
+
+  - rule_id: "vtube.lookat_sane"
+    display_name: "LookAt Configuration Sane"
+    severity: ERROR
+    description: >
+      The VRM firstPerson/lookAt configuration must be present and have sane values.
+      lookAtType must be 'Bone' or 'BlendShape'. Range values should be between 1 and 90 degrees.
+    field_path: "firstPerson.lookAt"
+    valid_lookat_types:
+      - "Bone"
+      - "BlendShape"
+    range_degrees_min: 1
+    range_degrees_max: 90
+
+  - rule_id: "vtube.first_person_bone"
+    display_name: "First Person Offset Bone Set"
+    severity: WARNING
+    description: >
+      VTube Studio uses the firstPerson offset to position the face tracking camera.
+      The firstPersonBone should be set to the head bone for accurate face tracking.
+    field_path: "firstPerson.firstPersonBone"
+
+  - rule_id: "vtube.humanoid_bones.head"
+    display_name: "Head Bone Present"
+    severity: ERROR
+    description: "VTube Studio requires a head bone for face tracking to function."
+    field_path: "humanoid.bones.head"
+
+  - rule_id: "vtube.humanoid_bones.neck"
+    display_name: "Neck Bone Present"
+    severity: ERROR
+    description: "VTube Studio requires a neck bone for head rotation tracking."
+    field_path: "humanoid.bones.neck"
+
+  - rule_id: "vtube.eye_bones"
+    display_name: "Eye Bones Present (at least one side)"
+    severity: WARNING
+    description: >
+      VTube Studio can use eye bones for eye tracking if present.
+      At least one of leftEye or rightEye bone should be defined.
+    field_path: "humanoid.bones.leftEye"

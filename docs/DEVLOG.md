@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-05-06 — Phase 5 Complete: First Forging — 134 Tests Green
+
+*Eldra Járnsdóttir, Forge Worker*
+
+All source domains built (Loom, Hoard, Gate, Annáll, Forge, Oracle Eye, Bridges/Core, Rúnstafr CLI, Mjöll MCP, Straumur REST). Full test suite written: schema, loader, hoard adapter, VRM reader, Gate compliance checker, Annáll adapters, dispatch unit tests, and a whole-stack smoke test using mock Forge and Oracle Eye. `pytest -m "not requires_blender"` → 134 passed. Build backend fixed for Python 3.10 compatibility. `datetime.UTC` → `timezone.utc` backport applied. Ruff auto-fixes applied; remaining issues are E501 line-length and intentional test patterns only.
+
+---
+
 ## 2026-05-06 — Genesis Session: The Forge Is Lit
 
 *Written by Eirwyn Rúnblóm, Scribe — closing Phase 4.*

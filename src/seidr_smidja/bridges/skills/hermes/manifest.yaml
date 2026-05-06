@@ -1,0 +1,61 @@
+# Seiðr-Smiðja — Hermes Skill Manifest
+# Install this file as a Hermes skill to allow Hermes agents to invoke the forge.
+#
+# Hermes agents can build avatars by:
+#   1. Running `seidr build <spec_yaml>` via Bash tool
+#   2. Using the REST bridge (Straumur) if running as a long-lived service
+#
+# This manifest describes the seidr CLI as a Hermes-compatible tool skill.
+
+skill:
+  name: seidr_avatar_forge
+  display_name: "Seiðr-Smiðja Avatar Forge"
+  version: "0.1.0"
+  description: >
+    Build, render, and export VRM avatars for VRChat and VTube Studio.
+    Write a YAML spec → submit to the forge → receive .vrm + render PNGs.
+
+invocation:
+  type: bash
+  entry: "seidr"
+  setup_hint: "pip install seidr-smidja && python tools/bootstrap_hoard.py"
+
+tools:
+  - name: build_avatar
+    description: "Build a VRM avatar from a YAML spec file."
+    command: "seidr build {spec_path} --out {output_dir} --json"
+    parameters:
+      spec_path:
+        type: string
+        description: "Path to the avatar spec YAML file."
+        required: true
+      output_dir:
+        type: string
+        description: "Output directory for .vrm and renders."
+        default: "output/"
+    returns: "JSON with success, vrm_path, render_paths, compliance_report, errors."
+
+  - name: inspect_vrm
+    description: "Run compliance check on an existing .vrm file."
+    command: "seidr inspect {vrm_path} --json"
+    parameters:
+      vrm_path:
+        type: string
+        description: "Path to the .vrm file to inspect."
+        required: true
+    returns: "JSON compliance report."
+
+  - name: bootstrap_hoard
+    description: "Download seed VRM assets needed for builds."
+    command: "python tools/bootstrap_hoard.py"
+    parameters: {}
+    returns: "Bootstrap progress and result summary."
+
+example_workflow: |
+  # Write a spec YAML (see examples/spec_minimal.yaml for template)
+  # Bootstrap assets (first run only):
+  python tools/bootstrap_hoard.py
+  # Build the avatar:
+  seidr build my_spec.yaml --out output/ --json
+  # Inspect the result:
+  seidr inspect output/my_avatar.vrm --json

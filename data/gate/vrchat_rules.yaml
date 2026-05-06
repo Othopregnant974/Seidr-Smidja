@@ -1,0 +1,208 @@
+# VRChat Compliance Rules for Seiðr-Smiðja
+# Source: VRChat Avatar Performance Ranking documentation (as of 2024)
+# All rules loaded at runtime — never hardcoded in Python (Sacred Law I).
+# Severity: ERROR = hard fail | WARNING = advisory
+
+target: VRCHAT
+display_name: "VRChat Avatar Compliance"
+
+# Performance tiers define polygon/material/texture budgets.
+# The active tier target is set in config/defaults.yaml gate.vrchat_tier_target
+performance_tiers:
+  Excellent:
+    polycount: 32000
+    skinned_mesh_count: 1
+    mesh_count: 4
+    material_count: 4
+    bone_count: 75
+    texture_memory_mb: 40
+    dynamic_bone_transform_count: 0
+    dynamic_bone_collider_count: 0
+    dynamic_bone_collision_check_count: 0
+    particle_system_count: 0
+    particle_active_limit: 0
+    trail_renderer_count: 0
+    line_renderer_count: 0
+    cloths_count: 0
+    physics_collider_count: 0
+    audio_source_count: 1
+  Good:
+    polycount: 70000
+    skinned_mesh_count: 2
+    mesh_count: 8
+    material_count: 8
+    bone_count: 150
+    texture_memory_mb: 75
+    dynamic_bone_transform_count: 32
+    dynamic_bone_collider_count: 8
+    dynamic_bone_collision_check_count: 256
+    particle_system_count: 4
+    particle_active_limit: 200
+    trail_renderer_count: 4
+    line_renderer_count: 4
+    cloths_count: 1
+    physics_collider_count: 8
+    audio_source_count: 4
+  Medium:
+    polycount: 70000
+    skinned_mesh_count: 8
+    mesh_count: 16
+    material_count: 16
+    bone_count: 256
+    texture_memory_mb: 110
+    dynamic_bone_transform_count: 256
+    dynamic_bone_collider_count: 32
+    dynamic_bone_collision_check_count: 1024
+    particle_system_count: 8
+    particle_active_limit: 750
+    trail_renderer_count: 8
+    line_renderer_count: 8
+    cloths_count: 4
+    physics_collider_count: 32
+    audio_source_count: 8
+  Poor:
+    polycount: 70000
+    skinned_mesh_count: 16
+    mesh_count: 24
+    material_count: 32
+    bone_count: 400
+    texture_memory_mb: 150
+
+# Structural rules (applied regardless of tier)
+rules:
+
+  - rule_id: "vrchat.humanoid_bones.required"
+    display_name: "Required Humanoid Bones Present"
+    severity: ERROR
+    description: >
+      VRChat requires a complete VRM humanoid skeleton. All listed bones must be present
+      in the avatar's bone map.
+    required_bones:
+      - "hips"
+      - "spine"
+      - "chest"
+      - "neck"
+      - "head"
+      - "leftShoulder"
+      - "rightShoulder"
+      - "leftUpperArm"
+      - "rightUpperArm"
+      - "leftLowerArm"
+      - "rightLowerArm"
+      - "leftHand"
+      - "rightHand"
+      - "leftUpperLeg"
+      - "rightUpperLeg"
+      - "leftLowerLeg"
+      - "rightLowerLeg"
+      - "leftFoot"
+      - "rightFoot"
+
+  - rule_id: "vrchat.visemes.sil"
+    display_name: "Viseme: sil (silence) Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'sil' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_sil"
+
+  - rule_id: "vrchat.visemes.pp"
+    display_name: "Viseme: pp Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'pp' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_PP"
+
+  - rule_id: "vrchat.visemes.ff"
+    display_name: "Viseme: ff Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'ff' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_FF"
+
+  - rule_id: "vrchat.visemes.th"
+    display_name: "Viseme: th Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'th' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_TH"
+
+  - rule_id: "vrchat.visemes.dd"
+    display_name: "Viseme: dd Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'dd' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_DD"
+
+  - rule_id: "vrchat.visemes.kk"
+    display_name: "Viseme: kk Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'kk' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_kk"
+
+  - rule_id: "vrchat.visemes.ch"
+    display_name: "Viseme: ch Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'ch' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_CH"
+
+  - rule_id: "vrchat.visemes.ss"
+    display_name: "Viseme: ss Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'ss' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_SS"
+
+  - rule_id: "vrchat.visemes.nn"
+    display_name: "Viseme: nn Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'nn' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_nn"
+
+  - rule_id: "vrchat.visemes.rr"
+    display_name: "Viseme: rr Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'rr' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_RR"
+
+  - rule_id: "vrchat.visemes.aa"
+    display_name: "Viseme: aa Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'aa' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_aa"
+
+  - rule_id: "vrchat.visemes.e"
+    display_name: "Viseme: e Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'e' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_E"
+
+  - rule_id: "vrchat.visemes.ih"
+    display_name: "Viseme: ih Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'ih' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_ih"
+
+  - rule_id: "vrchat.visemes.oh"
+    display_name: "Viseme: oh Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'oh' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_oh"
+
+  - rule_id: "vrchat.visemes.ou"
+    display_name: "Viseme: ou Expression Present"
+    severity: ERROR
+    description: "VRChat requires the 'ou' viseme blendshape for lip-sync."
+    field_path: "blendShapes.viseme_ou"
+
+  - rule_id: "vrchat.polycount"
+    display_name: "Polygon Count Within Tier Budget"
+    severity: ERROR
+    description: "Total polygon count must not exceed the budget for the target performance tier."
+    field_path: "mesh.polycount"
+    # Limit is resolved at runtime from performance_tiers[target_tier].polycount
+
+  - rule_id: "vrchat.material_count"
+    display_name: "Material Count Within Tier Budget"
+    severity: WARNING
+    description: "Total material count should not exceed the tier budget."
+    field_path: "materials.count"
+
+  - rule_id: "vrchat.texture_memory"
+    display_name: "Texture Memory Within Tier Budget"
+    severity: WARNING
+    description: "Estimated texture memory usage should not exceed the tier budget (MB)."
+    field_path: "textures.estimated_memory_mb"

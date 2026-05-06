@@ -1,5 +1,4 @@
-"""
-Oracle Eye — Óðins-Auga.
+"""Oracle Eye — Óðins-Auga.
 
 The render and vision feedback layer. After the Forge completes, the Oracle Eye
 orchestrates Blender (or a compatible headless renderer) to produce standard
@@ -13,3 +12,19 @@ This is Sacred Principle 2 — the Oracle Eye Is Never Closed.
 
 Public surface: see INTERFACE.md in this directory.
 """
+
+from seidr_smidja.oracle_eye.eye import (
+    RenderError,
+    RenderResult,
+    RenderView,
+    list_standard_views,
+    render,
+)
+
+__all__ = [
+    "render",
+    "list_standard_views",
+    "RenderView",
+    "RenderResult",
+    "RenderError",
+]

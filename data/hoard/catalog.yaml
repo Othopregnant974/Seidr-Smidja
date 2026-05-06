@@ -1,0 +1,51 @@
+# Seiðr-Smiðja — Hoard Catalog
+# This file lists all base .vrm assets available in the Hoard.
+# The LocalHoardAdapter reads this catalog to resolve asset_id → file path.
+# Paths are relative to the hoard bases_dir (config: hoard.bases_dir).
+#
+# License sources:
+#   VRM Consortium avatar samples: https://github.com/vrm-c/vrm-specification
+#   The sample avatars shipped here use the CC0 license (public domain).
+#   See each entry's license field and source_url for full details.
+
+format_version: "1"
+
+bases:
+
+  - asset_id: "vroid/sample_a"
+    display_name: "VRM Sample Avatar A"
+    description: >
+      A general-purpose humanoid VRM avatar provided by the VRM Consortium as a
+      freely usable sample. Suitable as a build base for testing and bootstrapping.
+    filename: "AvatarSampleA.vrm"
+    vrm_version: "0.0"
+    tags:
+      - "feminine"
+      - "humanoid"
+      - "sample"
+      - "vroid_style"
+    license: "CC0-1.0"
+    license_url: "https://creativecommons.org/publicdomain/zero/1.0/"
+    source_url: "https://github.com/vrm-c/vrm-specification/raw/master/samples/AvatarSample_A/AvatarSampleA.vrm"
+    sha256: null   # Populated by bootstrap_hoard.py after download
+    cached: false  # Set to true by bootstrap_hoard.py after successful download
+    file_size_bytes: null   # Set by bootstrap after download
+
+  - asset_id: "vroid/sample_b"
+    display_name: "VRM Sample Avatar B"
+    description: >
+      A second humanoid VRM avatar sample from the VRM Consortium.
+      Different proportions from Sample A; useful for testing height and body spec variations.
+    filename: "AvatarSampleB.vrm"
+    vrm_version: "0.0"
+    tags:
+      - "masculine"
+      - "humanoid"
+      - "sample"
+      - "vroid_style"
+    license: "CC0-1.0"
+    license_url: "https://creativecommons.org/publicdomain/zero/1.0/"
+    source_url: "https://github.com/vrm-c/vrm-specification/raw/master/samples/AvatarSample_B/AvatarSampleB.vrm"
+    sha256: null
+    cached: false
+    file_size_bytes: null

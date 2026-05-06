@@ -1,0 +1,12 @@
+# Seiðr-Smiðja — Minimal Avatar Spec
+# The simplest valid spec — only required fields.
+# Every optional field takes its default value.
+
+spec_version: "1.0"
+avatar_id: "my_avatar_v1"
+display_name: "My Avatar"
+base_asset_id: "vroid/sample_a"
+
+metadata:
+  author: "Agent Name"
+  license: "CC0-1.0"

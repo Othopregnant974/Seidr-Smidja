@@ -1,5 +1,4 @@
-"""
-Gate — the Compliance Gate.
+"""Gate — the Compliance Gate.
 
 The validation layer. Every .vrm output passes through the Gate before it is
 delivered. The Gate validates against:
@@ -15,3 +14,26 @@ Compliance rules live in YAML data files. None are hardcoded here.
 
 Public surface: see INTERFACE.md in this directory.
 """
+
+from seidr_smidja.gate.gate import check, list_rules
+from seidr_smidja.gate.models import (
+    ComplianceReport,
+    ComplianceRule,
+    ComplianceTarget,
+    GateError,
+    TargetResult,
+    Violation,
+    ViolationSeverity,
+)
+
+__all__ = [
+    "check",
+    "list_rules",
+    "ComplianceReport",
+    "ComplianceRule",
+    "ComplianceTarget",
+    "GateError",
+    "TargetResult",
+    "Violation",
+    "ViolationSeverity",
+]

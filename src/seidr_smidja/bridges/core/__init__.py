@@ -1,5 +1,4 @@
-"""
-Bridge Core — the Shared Anvil.
+"""Bridge Core — the Shared Anvil.
 
 The single orchestration path shared by all four Bridge sub-forms.
 Receives a normalized BuildRequest, runs the fixed pipeline:
@@ -16,3 +15,12 @@ smith is swinging. What works through one door works through all.
 
 Public surface: see INTERFACE.md in this directory.
 """
+
+from seidr_smidja.bridges.core.dispatch import (
+    BuildError,
+    BuildRequest,
+    BuildResponse,
+    dispatch,
+)
+
+__all__ = ["dispatch", "BuildRequest", "BuildResponse", "BuildError"]
