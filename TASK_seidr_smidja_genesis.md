@@ -99,10 +99,10 @@ Thin vertical slice end-to-end:
 - [ ] VRChat + VTube Studio compliance check on the slice output.
 
 #### Phase 7 — Closing the Day (Scribe)
-- [ ] Final `docs/DEVLOG.md` entry for the genesis session.
-- [ ] All MD files coherent, cross-references validated.
-- [ ] MEMORY.md updated with `Seidr-Smidja Quick Facts` and `project_seidr_smidja_status.md`.
-- [ ] All work committed and pushed to `development`.
+- [x] Final `docs/DEVLOG.md` entry for the genesis session — Genesis Closing (2026-05-06 evening) appended.
+- [x] All MD files coherent, cross-references validated — drift in DOMAIN_MAP.md and README.md corrected additively.
+- [x] MEMORY.md updated with `Seidr-Smidja Quick Facts` and `project_seidr_smidja_status.md` created.
+- [ ] All work committed and pushed to `development` — pending Runa's closing commit.
 
 ---
 
@@ -110,14 +110,15 @@ Thin vertical slice end-to-end:
 
 | Phase | Role | Status | Commit |
 |---|---|---|---|
-| 0 — Genesis | Runa | IN PROGRESS — TASK file being written | (this commit) |
-| 1 — Vision | Skald | PENDING | — |
-| 2 — Bones | Architect | PENDING | — |
-| 3 — Rivers | Cartographer | PENDING | — |
-| 4 — Memory | Scribe | PENDING | — |
-| 5 — First Forging | Forge Worker | COMPLETE — 134 tests green 2026-05-06 | pending commit |
-| 6 — Verification | Auditor | PENDING | — |
-| 7 — Closing | Scribe | PENDING | — |
+| 0 — Genesis | Runa | COMPLETE — TASK file written and pushed | `3e8f978` |
+| 1 — Vision | Skald | COMPLETE — PHILOSOPHY.md + SYSTEM_VISION.md | `6e48512` |
+| 2 — Bones | Architect | COMPLETE — DOMAIN_MAP + ARCHITECTURE + INTERFACE stubs | `9653e0a` |
+| 3 — Rivers | Cartographer | COMPLETE — DATA_FLOW.md + REPO_OVERVIEW.md | `d888115` |
+| 4 — Memory | Scribe | COMPLETE — README, MYTHIC_ENGINEERING, domain READMEs, DEVLOG, ADRs | `cde968a` |
+| 5 — First Forging | Forge Worker | COMPLETE — 134 tests green 2026-05-06 | `0b7d14d` |
+| 5.1 — Remediation | Forge Worker | COMPLETE — 159 tests green 2026-05-06, AUDIT-004/005/008/009 closed | `048312f` |
+| 6 — Verification | Auditor | COMPLETE — PASS WITH CONCERNS, 10 findings, 0 Crit/High | `8847707` |
+| 7 — Closing | Scribe | COMPLETE — 3 doc findings closed, cross-ref sweep, MEMORY updated | pending closing commit |
 
 ---
 

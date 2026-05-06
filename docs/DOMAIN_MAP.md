@@ -18,6 +18,8 @@
 Bridges → Loom → Forge → Oracle Eye → Gate → Annáll
 ```
 
+> **Correction (2026-05-06):** The complete pipeline order — including the Hoard which the Mermaid diagram below correctly shows — is `Bridges → Loom → Hoard → Forge → Oracle Eye → Gate → Annáll`. The Core dispatcher calls each domain in this order; Annáll is callable as a side-channel from any domain (per D-005). The shorthand above omits Hoard for brevity but should be read in light of this correction.
+
 No domain may import from a domain that depends on it. Circular imports are a forge-fire turned inward — they consume the structure. Any domain may import from Annáll (logging is ambient). No domain other than Bridges may import from Bridges.
 
 This law is enforced by architecture, not convention. If a dependency needs to cross the seam in the other direction, the answer is always a callback, an event, or a data structure passed as a parameter — not an import.
@@ -35,6 +37,8 @@ This law is enforced by architecture, not convention. If a dependency needs to c
 **Does not own:** Anything that touches Blender, file system writes to output paths, render logic, compliance rules, or agent protocol parsing.
 
 **Public contract:** Accepts raw dict or YAML/JSON input; returns a validated, typed `AvatarSpec` model or raises `LoomValidationError`. Provides `spec.to_yaml()`, `spec.to_json()`, and `spec.from_file(path)`. The `extensions` field is opaque to the Loom — it stores and round-trips it faithfully without interpreting it.
+
+> **Implementation note (2026-05-06):** The call shape `spec.from_file(path)` above describes the conceptual pattern; the actual public functions are `load_spec(path: Path) -> AvatarSpec` and `load_and_validate(path: Path) -> AvatarSpec` (alias). There is no instance method `from_file` on the `AvatarSpec` model — loading is always through module-level functions. See `src/seidr_smidja/loom/loader.py` and `src/seidr_smidja/loom/INTERFACE_AMENDMENT_2026-05-06.md`.
 
 **Dependencies:** None within the forge. May depend on `pydantic` and `pyyaml` as third-party libraries. May write to Annáll for validation event logging.
 

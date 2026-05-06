@@ -53,6 +53,8 @@ seidr check ./out/avatar.vrm
 seidr list-assets --type vrm_base
 ```
 
+> **Implementation note (2026-05-06 — AUDIT-003):** The compliance command is registered as `seidr inspect` in the implementation, not `seidr check`. The `seidr list-assets` CLI command is not yet implemented in v0.1 — the equivalent endpoint is `GET /v1/assets` on the Straumur REST bridge. See `src/seidr_smidja/bridges/INTERFACE_AMENDMENT_2026-05-06.md`.
+
 On success, `./out/` will contain `avatar.vrm` and a `renders/` directory with PNG previews.
 
 ### Through Mjöll (MCP)
@@ -106,11 +108,13 @@ The full phase-by-phase progress tracker lives in [`TASK_seidr_smidja_genesis.md
 
 ## Current Status
 
-**Genesis phase — vertical slice not yet forged.**
+**Genesis complete — vertical slice forged, 159 non-Blender tests green.**
 
-The founding documents are complete (Vision, Philosophy, Domain Map, Architecture, Data Flow, Repo Overview, all INTERFACE stubs, seven architectural decisions). The first vertical slice — a working `seidr build` command that produces a real `.vrm` and renders — is the next step (Phase 5, Forge Worker).
+The full Mythic Engineering genesis ritual (Phases 0–7) has run. All seven ADRs ratified; all 10 audit findings from `docs/AUDIT_GENESIS.md` closed. The `seidr build` pipeline is wired end-to-end: Loom validates specs, Hoard resolves assets, Forge and Oracle Eye call Blender headlessly (requires Blender), Gate runs VRChat/VTube Studio compliance, Annáll records every session. Run `pytest -m "not requires_blender"` for the 159-test non-Blender suite; the full forge cycle requires Blender in PATH or `BLENDER_PATH` set.
 
-See the progress tracker in [`TASK_seidr_smidja_genesis.md`](TASK_seidr_smidja_genesis.md) for what is done and what is next.
+> **Note (2026-05-06):** The badge above still reads "genesis phase" — it will be updated when the first Blender-enabled CI run completes and v0.1 is tagged.
+
+See the progress tracker in [`TASK_seidr_smidja_genesis.md`](TASK_seidr_smidja_genesis.md) and `docs/DEVLOG.md` for the full genesis record.
 
 ---
 
