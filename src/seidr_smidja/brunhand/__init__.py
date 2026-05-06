@@ -97,10 +97,12 @@ from seidr_smidja.brunhand.client.client import BrunhandClient  # noqa: E402
 from seidr_smidja.brunhand.client.session import BrunhandSession, Tengslastig  # noqa: E402
 from seidr_smidja.brunhand.exceptions import (  # noqa: E402
     BrunhandAuthError,
+    BrunhandCapabilityError,  # B-007: was missing from __all__
     BrunhandConfigError,
     BrunhandConnectionError,
     BrunhandError,
     BrunhandPrimitiveError,
+    BrunhandProtocolError,   # B-007: was missing from __all__
     BrunhandTimeoutError,
     VroidNotRunningError,
 )
@@ -112,9 +114,11 @@ __all__ = [
     "BrunhandSession",
     "BrunhandError",
     "BrunhandAuthError",
+    "BrunhandCapabilityError",   # B-007
     "BrunhandConfigError",
     "BrunhandConnectionError",
     "BrunhandPrimitiveError",
+    "BrunhandProtocolError",     # B-007
     "BrunhandTimeoutError",
     "VroidNotRunningError",
 ]

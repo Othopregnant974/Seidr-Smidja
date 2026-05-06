@@ -25,7 +25,8 @@ class TestHandleScreenshot:
         from seidr_smidja.brunhand.models import BrunhandResponseEnvelope, ScreenshotRequest
 
         req = _make_req(ScreenshotRequest)
-        with patch("seidr_smidja.brunhand.daemon.runtime.take_screenshot") as mock_cap:
+        with patch("seidr_smidja.brunhand.daemon.runtime.take_screenshot") as mock_cap, \
+             patch("seidr_smidja.brunhand.daemon.capabilities.is_primitive_available", return_value=True):
             mock_cap.return_value = {
                 "png_bytes_b64": "AAAA",
                 "width": 1920, "height": 1080,
@@ -41,7 +42,8 @@ class TestHandleScreenshot:
         from seidr_smidja.brunhand.models import ScreenshotRequest
 
         req = _make_req(ScreenshotRequest)
-        with patch("seidr_smidja.brunhand.daemon.runtime.take_screenshot", side_effect=RuntimeError("boom")):
+        with patch("seidr_smidja.brunhand.daemon.runtime.take_screenshot", side_effect=RuntimeError("boom")), \
+             patch("seidr_smidja.brunhand.daemon.capabilities.is_primitive_available", return_value=True):
             result = handle_screenshot(req)
         # INVARIANT: never raises — returns error envelope
         assert result.success is False
@@ -53,7 +55,8 @@ class TestHandleClick:
         from seidr_smidja.brunhand.models import ClickRequest
 
         req = _make_req(ClickRequest, x=100, y=200)
-        with patch("seidr_smidja.brunhand.daemon.runtime.do_click") as mock_click:
+        with patch("seidr_smidja.brunhand.daemon.runtime.do_click") as mock_click, \
+             patch("seidr_smidja.brunhand.daemon.capabilities.is_primitive_available", return_value=True):
             mock_click.return_value = {"x": 100, "y": 200, "clicks_delivered": 1, "button": "left"}
             result = handle_click(req)
 
@@ -64,10 +67,24 @@ class TestHandleClick:
         from seidr_smidja.brunhand.models import ClickRequest
 
         req = _make_req(ClickRequest, x=0, y=0)
-        with patch("seidr_smidja.brunhand.daemon.runtime.do_click", side_effect=OSError("no access")):
+        with patch("seidr_smidja.brunhand.daemon.runtime.do_click", side_effect=OSError("no access")), \
+             patch("seidr_smidja.brunhand.daemon.capabilities.is_primitive_available", return_value=True):
             result = handle_click(req)
 
         assert result.success is False
+
+    def test_returns_capabilities_error_when_unavailable(self) -> None:
+        """B-006: capability_unavailable returns structured capabilities_error."""
+        from seidr_smidja.brunhand.daemon.endpoints.primitives import handle_click
+        from seidr_smidja.brunhand.models import ClickRequest
+
+        req = _make_req(ClickRequest, x=0, y=0)
+        with patch("seidr_smidja.brunhand.daemon.capabilities.is_primitive_available", return_value=False):
+            result = handle_click(req)
+
+        assert result.success is False
+        assert result.error is not None
+        assert result.error.error_type == "capabilities_error"
 
 
 class TestHandleHotkey:
@@ -76,7 +93,8 @@ class TestHandleHotkey:
         from seidr_smidja.brunhand.models import HotkeyRequest
 
         req = _make_req(HotkeyRequest, keys=["ctrl", "s"])
-        with patch("seidr_smidja.brunhand.daemon.runtime.do_hotkey") as mock_hk:
+        with patch("seidr_smidja.brunhand.daemon.runtime.do_hotkey") as mock_hk, \
+             patch("seidr_smidja.brunhand.daemon.capabilities.is_primitive_available", return_value=True):
             mock_hk.return_value = {"keys": ["ctrl", "s"]}
             result = handle_hotkey(req)
         assert result.success is True
@@ -88,7 +106,8 @@ class TestHandleWaitForWindow:
         from seidr_smidja.brunhand.models import WaitForWindowRequest
 
         req = _make_req(WaitForWindowRequest, title_pattern="VRoid Studio", timeout_seconds=0.1)
-        with patch("seidr_smidja.brunhand.daemon.runtime.do_wait_for_window") as mock_wfw:
+        with patch("seidr_smidja.brunhand.daemon.runtime.do_wait_for_window") as mock_wfw, \
+             patch("seidr_smidja.brunhand.daemon.capabilities.is_primitive_available", return_value=True):
             mock_wfw.return_value = {"found": False, "elapsed_seconds": 0.1}
             result = handle_wait_for_window(req)
         # Timeout = success=True, found=False (NOT an error)

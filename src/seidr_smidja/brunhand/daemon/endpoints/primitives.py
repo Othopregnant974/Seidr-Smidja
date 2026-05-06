@@ -12,7 +12,9 @@ All 9 generic GUI automation primitives:
   POST /v1/brunhand/wait_for_window
 
 Each handler:
-  1. Checks Sjálfsmöguleiki — raises if primitive not available.
+  1. B-006 FIX: Checks Sjálfsmöguleiki (is_primitive_available) BEFORE the try block.
+     If unavailable, returns a structured response with error_type='capabilities_error'
+     immediately — no RuntimeError propagation.
   2. Logs primitive.started to Annáll.
   3. Calls runtime shim (pyautogui/mss/pygetwindow via runtime.py).
   4. Returns BrunhandResponseEnvelope on success or structured error on failure.
@@ -39,6 +41,34 @@ from seidr_smidja.brunhand.models import (
     TypeTextRequest,
     WaitForWindowRequest,
 )
+
+
+def _make_capability_unavailable_response(
+    request_envelope: Any,
+    primitive: str,
+    reason: str = "",
+) -> BrunhandResponseEnvelope:
+    """B-006: Return a structured capabilities_error response (DATA_FLOW F4).
+
+    This is returned BEFORE the primitive executes when the capability is absent
+    on this platform.  The error_type is 'capabilities_error' so the client-side
+    _raise_if_primitive_error() can discriminate and raise BrunhandCapabilityError.
+    """
+    req_id = getattr(request_envelope, "request_id", "")
+    sess_id = getattr(request_envelope, "session_id", "")
+    return BrunhandResponseEnvelope(
+        request_id=req_id,
+        session_id=sess_id,
+        success=False,
+        error=BrunhandErrorDetail(
+            error_type="capabilities_error",
+            message=(
+                f"Primitive '{primitive}' is not available on this daemon platform. "
+                + (reason or "Required library is not installed.")
+            ),
+            primitive=primitive,
+        ),
+    )
 
 
 def _make_error_response(
@@ -74,6 +104,13 @@ def handle_screenshot(
     req: ScreenshotRequest, annall: Any = None, session_id: str = ""
 ) -> BrunhandResponseEnvelope:
     """Handle POST /v1/brunhand/screenshot."""
+    # B-006: Capability check before try block — structured capabilities_error response
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("screenshot"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "screenshot"})
+        return _make_capability_unavailable_response(req, "screenshot")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started", {
         "primitive": "screenshot",
@@ -83,7 +120,8 @@ def handle_screenshot(
     try:
         from seidr_smidja.brunhand.daemon.runtime import take_screenshot
         region = req.region.model_dump() if req.region else None
-        result = take_screenshot(region=region)
+        # B-012: pass monitor_index from request (default 0 = primary)
+        result = take_screenshot(region=region, monitor_index=getattr(req, "monitor_index", 0))
         latency = (time.monotonic() - start) * 1000
         _log_annall(annall, session_id, "brunhand.daemon.primitive.completed", {
             "primitive": "screenshot",
@@ -115,6 +153,12 @@ def handle_click(
     req: ClickRequest, annall: Any = None, session_id: str = ""
 ) -> BrunhandResponseEnvelope:
     """Handle POST /v1/brunhand/click."""
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("click"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "click"})
+        return _make_capability_unavailable_response(req, "click")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started", {
         "primitive": "click",
@@ -144,6 +188,12 @@ def handle_move(
     req: MoveRequest, annall: Any = None, session_id: str = ""
 ) -> BrunhandResponseEnvelope:
     """Handle POST /v1/brunhand/move."""
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("move"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "move"})
+        return _make_capability_unavailable_response(req, "move")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started",
                 {"primitive": "move", "request_id": req.request_id})
@@ -168,6 +218,12 @@ def handle_drag(
     req: DragRequest, annall: Any = None, session_id: str = ""
 ) -> BrunhandResponseEnvelope:
     """Handle POST /v1/brunhand/drag."""
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("drag"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "drag"})
+        return _make_capability_unavailable_response(req, "drag")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started",
                 {"primitive": "drag", "request_id": req.request_id})
@@ -195,6 +251,12 @@ def handle_scroll(
     req: ScrollRequest, annall: Any = None, session_id: str = ""
 ) -> BrunhandResponseEnvelope:
     """Handle POST /v1/brunhand/scroll."""
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("scroll"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "scroll"})
+        return _make_capability_unavailable_response(req, "scroll")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started",
                 {"primitive": "scroll", "request_id": req.request_id})
@@ -219,6 +281,12 @@ def handle_type_text(
     req: TypeTextRequest, annall: Any = None, session_id: str = ""
 ) -> BrunhandResponseEnvelope:
     """Handle POST /v1/brunhand/type."""
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("type_text"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "type_text"})
+        return _make_capability_unavailable_response(req, "type_text")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started",
                 {"primitive": "type_text", "request_id": req.request_id,
@@ -244,6 +312,12 @@ def handle_hotkey(
     req: HotkeyRequest, annall: Any = None, session_id: str = ""
 ) -> BrunhandResponseEnvelope:
     """Handle POST /v1/brunhand/hotkey."""
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("hotkey"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "hotkey"})
+        return _make_capability_unavailable_response(req, "hotkey")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started",
                 {"primitive": "hotkey", "request_id": req.request_id, "keys": req.keys})
@@ -268,6 +342,12 @@ def handle_find_window(
     req: FindWindowRequest, annall: Any = None, session_id: str = ""
 ) -> BrunhandResponseEnvelope:
     """Handle POST /v1/brunhand/find_window."""
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("find_window"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "find_window"})
+        return _make_capability_unavailable_response(req, "find_window")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started",
                 {"primitive": "find_window", "request_id": req.request_id,
@@ -299,6 +379,12 @@ def handle_wait_for_window(
     The client automatically sets httpx timeout = timeout_seconds + buffer.
     See D-010 Cartographer tension #3 and models.py WaitForWindowRequest.
     """
+    from seidr_smidja.brunhand.daemon.capabilities import is_primitive_available
+    if not is_primitive_available("wait_for_window"):
+        _log_annall(annall, session_id, "brunhand.daemon.primitive.capability_unavailable",
+                    {"primitive": "wait_for_window"})
+        return _make_capability_unavailable_response(req, "wait_for_window")
+
     start = time.monotonic()
     _log_annall(annall, session_id, "brunhand.daemon.primitive.started",
                 {"primitive": "wait_for_window", "request_id": req.request_id,

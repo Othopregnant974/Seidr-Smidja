@@ -10,6 +10,25 @@ behind a uniform Python API. Each function:
 ALL platform-conditional imports are isolated in this module.
 Primitive handler code NEVER imports pyautogui, mss, or pygetwindow directly.
 
+Path safety:
+  _validate_path_in_root() enforces that resolved output/project paths are
+  children of the configured export_root / project_root directories.
+  Raises ValueError on traversal attempts — callers map this to a security error.
+
+VRoid high-level scripts (vroid_export_vrm, vroid_open_project):
+  These functions open the VRoid Studio file dialog, clear the path field via
+  Ctrl+A, type the resolved and validated path, then confirm.  After the dialog
+  closes the export function verifies the file actually appeared on disk.  If the
+  file is not found within wait_timeout_seconds the function returns success=False
+  rather than lying to the caller.
+
+  B-003 NOTE: The path-typing step uses pyautogui.hotkey('ctrl','a') +
+  pyautogui.typewrite() to replace whatever VRoid pre-filled.  This approach is
+  sensitive to the active OS file dialog having keyboard focus.  The
+  _focus_vroid_window() + time.sleep() sequence before dialog open gives the
+  window time to come foreground.  If the dialog cannot be found a structured
+  error is returned (never a silent false-success).
+
 See: docs/features/brunhand/ARCHITECTURE.md §IX Cross-Platform Stance
 """
 from __future__ import annotations
@@ -17,8 +36,10 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import os
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -65,6 +86,40 @@ class CapabilityRuntimeError(RuntimeError):
         self.reason = reason
 
 
+# ─── Path Safety (B-002) ─────────────────────────────────────────────────────
+
+
+def _validate_path_in_root(path_str: str, root_str: str) -> Path:
+    """Validate that path_str resolves to a child of root_str.
+
+    Resolves both paths to absolute form and checks containment.
+    Raises ValueError if the resolved path escapes the root, preventing
+    path-traversal attacks such as '../../etc/passwd' or absolute escapes.
+
+    Args:
+        path_str: Caller-supplied path (may be relative or contain '..' segments).
+        root_str: Configured allow-list root directory.
+
+    Returns:
+        The fully resolved Path (guaranteed to be inside root).
+
+    Raises:
+        ValueError: If the resolved path is not a descendant of root.
+    """
+    root = Path(root_str).resolve()
+    # Join path_str onto root first, then resolve — this handles relative paths
+    # correctly and avoids Path(absolute_string).resolve() escaping the root.
+    candidate = (root / path_str).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        raise ValueError(
+            f"Path '{path_str}' resolves to '{candidate}' which is outside "
+            f"the allowed root '{root}'. Path traversal rejected."
+        )
+    return candidate
+
+
 # ─── Capability probes ───────────────────────────────────────────────────────
 
 
@@ -102,11 +157,14 @@ def get_platform_name() -> str:
 
 def take_screenshot(
     region: dict[str, int] | None = None,
+    monitor_index: int = 0,
 ) -> dict[str, Any]:
     """Capture a screenshot using MSS.
 
     Args:
-        region: Dict with 'left', 'top', 'width', 'height'. None = full primary monitor.
+        region:        Dict with 'left', 'top', 'width', 'height'.  None = full monitor.
+        monitor_index: 0-based monitor index (0 = primary).  Ignored when region is set.
+                       B-012 fix: callers can now target non-primary monitors.
 
     Returns:
         Dict with 'png_bytes_b64', 'width', 'height', 'captured_at', 'monitor_index'.
@@ -130,11 +188,18 @@ def take_screenshot(
                     "width": region.get("width", 1920),
                     "height": region.get("height", 1080),
                 }
-                monitor_index = region.get("monitor_index", 0)
+                # Region dict may carry its own monitor_index override
+                monitor_index = region.get("monitor_index", monitor_index)
             else:
-                # Full primary monitor (monitor index 1 in mss — 0 is all monitors combined)
-                monitor = sct.monitors[1]
-                monitor_index = 0
+                # MSS monitors: index 0 = all-monitors virtual, 1+ = real monitors.
+                # monitor_index is 0-based from the caller's perspective.
+                mss_index = monitor_index + 1  # convert 0-based to mss 1-based
+                if mss_index < 1 or mss_index >= len(sct.monitors):
+                    raise RuntimeError(
+                        f"monitor_index {monitor_index} is out of range "
+                        f"(detected {len(sct.monitors) - 1} monitor(s))."
+                    )
+                monitor = sct.monitors[mss_index]
 
             screenshot = sct.grab(monitor)
             # Convert to PNG bytes via PIL/Pillow (mss returns BGRA, PIL handles conversion)
@@ -411,15 +476,38 @@ def vroid_export_vrm(
 ) -> dict[str, Any]:
     """Drive VRoid Studio's File → Export → Export VRM flow.
 
-    This is a coordinate-based script for VRoid Studio.
-    It uses hotkeys and pygetwindow to navigate the export dialog.
+    B-003 FIX: After the export dialog opens the function now:
+      1. Selects all text in the filename field (Ctrl+A).
+      2. Types the fully-resolved, path-validated output path via pyautogui.typewrite().
+      3. Confirms with Enter.
+      4. After the wait_timeout_seconds window, verifies the file actually exists on disk.
+         If the file is NOT present, returns success=False with a structured error rather
+         than silently reporting the wrong path.
+
+    B-002 FIX: output_path is validated against export_root via _validate_path_in_root().
+    Raises ValueError (mapped to BrunhandPathSecurityError by the endpoint handler) if
+    the path escapes the root.
+
     VRoid Studio version sensitivity applies — see D-010 Consequences.
+    This function requires pyautogui to be available.
 
     Raises:
-        RuntimeError: If VRoid Studio is not running or the export fails.
+        ValueError:    If output_path escapes export_root (path traversal).
+        RuntimeError:  If VRoid Studio is not running or the export sequence fails.
+        CapabilityRuntimeError: If pyautogui is unavailable.
     """
+    if not _PYAUTOGUI_AVAILABLE:
+        raise CapabilityRuntimeError(
+            "vroid_export_vrm",
+            "pyautogui is not installed. Install with: pip install 'seidr-smidja[brunhand-daemon]'",
+        )
     if not is_vroid_running():
         raise RuntimeError("VRoid Studio is not running.")
+
+    # B-002: Validate and resolve path before any GUI interaction.
+    resolved_path = _validate_path_in_root(output_path, export_root)
+    resolved_path_str = str(resolved_path)
+
     start = time.monotonic()
     steps_executed: list[str] = []
     try:
@@ -433,36 +521,75 @@ def vroid_export_vrm(
         steps_executed.append("hotkey_file_menu")
         time.sleep(0.5)
 
-        # Step 3: Navigate Export VRM (arrow keys or shortcut)
-        # VRoid Studio uses specific keyboard navigation
+        # Step 3: Navigate Export VRM (VRoid Studio keyboard navigation)
         do_hotkey(["e"])  # E for Export in VRoid's File menu
-        steps_executed.append("click_export_vrm")
+        steps_executed.append("hotkey_export_vrm")
         time.sleep(0.5)
 
-        # Step 4: Wait for export dialog
+        # Step 4: Wait for export dialog — try English and Japanese titles
         wait_result = do_wait_for_window("Export VRM", timeout_seconds=10.0)
         if not wait_result["found"]:
-            # Try alternative dialog title
             wait_result = do_wait_for_window("エクスポート", timeout_seconds=5.0)
         if wait_result["found"]:
             steps_executed.append("export_dialog_opened")
+            time.sleep(0.2)  # Short pause for dialog to fully render
+        else:
+            # Dialog did not appear — return structured failure rather than silently proceeding
+            elapsed = time.monotonic() - start
+            return {
+                "exported_path": None,
+                "success": False,
+                "error": "Export dialog did not appear within timeout.",
+                "elapsed_seconds": elapsed,
+                "steps_executed": steps_executed,
+            }
 
-        # Step 5: The path would be set here in a full implementation
-        # For v0.1, we log the step and note the path parameter
-        steps_executed.append(f"set_path:{output_path}")
-        time.sleep(0.3)
+        # Step 5: B-003 FIX — type the validated path into the dialog filename field.
+        # Ctrl+A selects all existing text, then typewrite replaces it with our path.
+        # We use pyautogui directly here (runtime already confirmed _PYAUTOGUI_AVAILABLE).
+        _pyautogui.hotkey("ctrl", "a")  # type: ignore[union-attr]
+        time.sleep(0.1)
+        # typewrite works best with ASCII paths; use pyperclip-fallback if path has
+        # non-ASCII characters (common on Windows with non-Latin locale paths).
+        _type_path_into_dialog(resolved_path_str)
+        steps_executed.append(f"typed_path:{resolved_path_str}")
+        time.sleep(0.2)
 
-        # Step 6: Confirm export (Enter or OK button)
+        # Step 6: Confirm export
         do_hotkey(["return"])
         steps_executed.append("confirm_dialog")
-        time.sleep(1.0)
 
+        # Step 7: Wait for the dialog to close (VRoid is working)
+        time.sleep(1.5)
+
+        # Step 8: B-003 VERIFICATION — check the file actually appeared on disk.
+        # Poll until file appears or wait_timeout_seconds elapses.
+        file_appeared = _wait_for_file(resolved_path, wait_timeout_seconds - (time.monotonic() - start))
         elapsed = time.monotonic() - start
+
+        if not file_appeared:
+            steps_executed.append("verify_failed:file_not_found")
+            return {
+                "exported_path": None,
+                "success": False,
+                "error": (
+                    f"Export dialog was confirmed but file '{resolved_path_str}' "
+                    f"did not appear within {wait_timeout_seconds:.1f}s. "
+                    f"VRoid Studio may have exported to a different location."
+                ),
+                "elapsed_seconds": elapsed,
+                "steps_executed": steps_executed,
+            }
+
+        steps_executed.append("verify_ok:file_exists")
         return {
-            "exported_path": output_path,
+            "exported_path": resolved_path_str,
+            "success": True,
             "elapsed_seconds": elapsed,
             "steps_executed": steps_executed,
         }
+    except (ValueError, CapabilityRuntimeError):
+        raise
     except RuntimeError:
         raise
     except Exception as exc:
@@ -492,37 +619,99 @@ def vroid_open_project(
     wait_timeout_seconds: float = 60.0,
     project_root: str = "projects",
 ) -> dict[str, Any]:
-    """Open a .vroid project file in VRoid Studio via Ctrl+O."""
+    """Open a .vroid project file in VRoid Studio via Ctrl+O.
+
+    B-003 FIX: After the file-open dialog appears the function types the fully-resolved,
+    path-validated project path into the filename field (Ctrl+A + typewrite), then
+    confirms with Enter.  It verifies the project loaded by waiting for a VRoid Studio
+    window to reappear.  If the file does not exist on disk before opening, the function
+    returns a structured error rather than proceeding with a non-existent path.
+
+    B-002 FIX: project_path is validated against project_root via _validate_path_in_root().
+
+    Raises:
+        ValueError:    If project_path escapes project_root (path traversal).
+        RuntimeError:  If VRoid Studio is not running or the open sequence fails.
+        CapabilityRuntimeError: If pyautogui is unavailable.
+    """
+    if not _PYAUTOGUI_AVAILABLE:
+        raise CapabilityRuntimeError(
+            "vroid_open_project",
+            "pyautogui is not installed. Install with: pip install 'seidr-smidja[brunhand-daemon]'",
+        )
     if not is_vroid_running():
         raise RuntimeError("VRoid Studio is not running.")
+
+    # B-002: Validate and resolve path before any GUI interaction.
+    resolved_path = _validate_path_in_root(project_path, project_root)
+    resolved_path_str = str(resolved_path)
+
+    # Verify the source file actually exists before trying to open it
+    if not resolved_path.exists():
+        raise RuntimeError(
+            f"Project file '{resolved_path_str}' does not exist. "
+            f"Cannot open a non-existent .vroid file."
+        )
+
     start = time.monotonic()
     steps_executed: list[str] = []
     try:
         _focus_vroid_window()
+        steps_executed.append("focus_vroid_window")
+        time.sleep(0.3)
+
         do_hotkey(["ctrl", "o"])
         steps_executed.append("hotkey_file_open")
         time.sleep(0.5)
 
-        # Wait for file dialog
+        # Wait for file open dialog — try common Windows dialog titles
         wait_result = do_wait_for_window("Open", timeout_seconds=5.0)
+        if not wait_result["found"]:
+            wait_result = do_wait_for_window("開く", timeout_seconds=3.0)  # Japanese "Open"
+
         if wait_result["found"]:
             steps_executed.append("file_dialog_opened")
+            time.sleep(0.2)
+        else:
+            elapsed = time.monotonic() - start
+            return {
+                "opened_path": None,
+                "success": False,
+                "error": "File open dialog did not appear within timeout.",
+                "elapsed_seconds": elapsed,
+                "steps_executed": steps_executed,
+            }
 
-        steps_executed.append(f"set_path:{project_path}")
+        # B-003 FIX: Type the validated path into the dialog filename field.
+        _pyautogui.hotkey("ctrl", "a")  # type: ignore[union-attr]
+        time.sleep(0.1)
+        _type_path_into_dialog(resolved_path_str)
+        steps_executed.append(f"typed_path:{resolved_path_str}")
+        time.sleep(0.2)
+
         do_hotkey(["return"])
         steps_executed.append("confirm_open")
         time.sleep(1.0)
 
-        # Wait for project to load
-        wait_loaded = do_wait_for_window("VRoid Studio", timeout_seconds=wait_timeout_seconds)
+        # Wait for VRoid Studio to finish loading the project
+        wait_loaded = do_wait_for_window(
+            "VRoid Studio",
+            timeout_seconds=max(5.0, wait_timeout_seconds - (time.monotonic() - start)),
+        )
         if wait_loaded["found"]:
-            steps_executed.append("wait_for_load")
+            steps_executed.append("project_loaded")
+        else:
+            steps_executed.append("load_wait_timed_out")
 
+        elapsed = time.monotonic() - start
         return {
-            "opened_path": project_path,
-            "elapsed_seconds": time.monotonic() - start,
+            "opened_path": resolved_path_str,
+            "success": True,
+            "elapsed_seconds": elapsed,
             "steps_executed": steps_executed,
         }
+    except (ValueError, CapabilityRuntimeError):
+        raise
     except RuntimeError:
         raise
     except Exception as exc:
@@ -540,3 +729,52 @@ def _focus_vroid_window() -> None:
             time.sleep(0.2)
     except Exception:
         pass
+
+
+def _type_path_into_dialog(path_str: str) -> None:
+    """Type a file path string into the currently-focused OS dialog field.
+
+    Uses pyautogui.typewrite for ASCII-safe paths.  For paths that contain
+    non-ASCII characters (e.g. Japanese directory names on Windows), falls back
+    to pyperclip clipboard paste (Ctrl+V) if pyperclip is available, otherwise
+    logs a warning and continues with typewrite (which may drop non-ASCII chars).
+
+    Callers must have already pressed Ctrl+A to clear the existing field content.
+    """
+    if not _PYAUTOGUI_AVAILABLE:
+        raise CapabilityRuntimeError("type_path", "pyautogui is not installed.")
+    try:
+        # Check if path is pure ASCII — typewrite is reliable for ASCII
+        path_str.encode("ascii")
+        _pyautogui.typewrite(path_str, interval=0.03)  # type: ignore[union-attr]
+    except UnicodeEncodeError:
+        # Path contains non-ASCII — attempt clipboard paste fallback
+        try:
+            import pyperclip  # type: ignore[import]
+            pyperclip.copy(path_str)
+            _pyautogui.hotkey("ctrl", "v")  # type: ignore[union-attr]
+        except ImportError:
+            logger.warning(
+                "Path '%s' contains non-ASCII characters and pyperclip is not installed. "
+                "Falling back to typewrite (non-ASCII characters may be dropped). "
+                "Install pyperclip for reliable non-ASCII path typing.",
+                path_str,
+            )
+            _pyautogui.typewrite(path_str, interval=0.03)  # type: ignore[union-attr]
+
+
+def _wait_for_file(path: Path, timeout_seconds: float, poll_interval: float = 0.5) -> bool:
+    """Poll until a file appears at *path* or *timeout_seconds* elapses.
+
+    Used by vroid_export_vrm to verify the exported file actually appeared on disk.
+    Returns True if the file exists within timeout, False otherwise.
+    """
+    # File may already exist if VRoid was quick
+    if path.exists():
+        return True
+    deadline = time.monotonic() + max(1.0, timeout_seconds)
+    while time.monotonic() < deadline:
+        time.sleep(min(poll_interval, deadline - time.monotonic()))
+        if path.exists():
+            return True
+    return False

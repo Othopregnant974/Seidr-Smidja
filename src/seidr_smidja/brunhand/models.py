@@ -139,11 +139,23 @@ class CapabilitiesManifest(BaseModel):
 
 
 class ScreenshotRequest(BrunhandRequestEnvelope):
-    """POST /v1/brunhand/screenshot — capture full screen or region."""
+    """POST /v1/brunhand/screenshot — capture full screen or region.
+
+    B-012: monitor_index selects which physical monitor to capture when region
+    is not specified.  0 = primary monitor (default).  Ignored if region is set.
+    """
 
     region: ScreenRect | None = Field(
         default=None,
-        description="Capture region. If null, captures the full primary monitor.",
+        description="Capture region. If null, captures the full selected monitor.",
+    )
+    monitor_index: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "0-based monitor index. 0 = primary monitor. "
+            "Ignored when region is specified. B-012 multi-monitor support."
+        ),
     )
 
 
@@ -239,9 +251,20 @@ class ScrollPayload(BaseModel):
 
 
 class TypeTextRequest(BrunhandRequestEnvelope):
-    """POST /v1/brunhand/type — type a text string."""
+    """POST /v1/brunhand/type — type a text string.
 
-    text: str
+    B-015: text is capped at 10,000 characters to prevent runaway typewrite() calls
+    that would block the daemon's thread pool for extended periods.  For longer
+    sequences split the text across multiple type_text calls.
+    """
+
+    text: str = Field(
+        max_length=10000,
+        description=(
+            "Text to type. Maximum 10,000 characters per call. "
+            "Split longer sequences across multiple type_text requests."
+        ),
+    )
     interval: float = 0.05
 
 

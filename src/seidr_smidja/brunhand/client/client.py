@@ -231,6 +231,15 @@ class BrunhandClient:
 
         self._base_url = f"{self._scheme}://{host}:{port}"
 
+        # B-008: Warn when TLS verification is disabled (ARCHITECTURE.md §X).
+        if not self._verify_tls:
+            logger.warning(
+                "BrunhandClient: TLS verification disabled for host %s. "
+                "Only acceptable on Tailscale-internal topology where the network "
+                "layer provides confidentiality. Do NOT use on public networks.",
+                host,
+            )
+
         # Build httpx client
         self._client = httpx.Client(
             base_url=self._base_url,
@@ -439,8 +448,13 @@ class BrunhandClient:
         primitive: str,
         session_id: str = "",
     ) -> None:
-        """Raise a typed exception if the envelope indicates failure."""
+        """Raise a typed exception if the envelope indicates failure.
+
+        B-006: 'capabilities_error' error_type now raises BrunhandCapabilityError
+        so agents can discriminate capability absence from primitive execution failure.
+        """
         from seidr_smidja.brunhand.exceptions import (
+            BrunhandCapabilityError,
             BrunhandPrimitiveError,
             VroidNotRunningError,
         )
@@ -450,6 +464,17 @@ class BrunhandClient:
                 error_type = error.get("error_type", "")
                 message = error.get("message", "Primitive failed.")
                 vroid_running = error.get("vroid_running", True)
+
+                # B-006: Structured capabilities_error → BrunhandCapabilityError
+                if error_type == "capabilities_error":
+                    raise BrunhandCapabilityError(
+                        message=message,
+                        primitive_name=primitive,
+                        platform=error.get("platform", ""),
+                        host=self.host,
+                        request_id=envelope.get("request_id", ""),
+                        session_id=session_id,
+                    )
 
                 if error_type == "VroidNotRunningError" or not vroid_running:
                     raise VroidNotRunningError(

@@ -52,24 +52,49 @@ class GaeslumadrMiddleware(BaseHTTPMiddleware):  # type: ignore[misc]
 
     The token is loaded at daemon startup and held in memory.
     It is NEVER written to any log, trace, or Annáll event.
+
+    B-005 FIX: Instead of a post-construction set_daemon_session_id() call on
+    a potentially dead instance, this middleware accepts a mutable list reference
+    (session_id_ref) whose first element is updated by the startup handler.
+    The live middleware always reads the current session ID.
+
+    B-009 FIX: trust_proxy_headers gates X-Forwarded-For use (default False).
     """
 
-    def __init__(self, app: Any, token: str, annall: Any = None) -> None:
+    def __init__(
+        self,
+        app: Any,
+        token: str,
+        annall: Any = None,
+        session_id_ref: list[str] | None = None,
+        trust_proxy_headers: bool = False,
+    ) -> None:
         """Construct Gæslumaðr.
 
         Args:
-            app:    The ASGI app to wrap.
-            token:  The configured bearer token (held in memory, never logged).
-            annall: Optional AnnallPort for logging rejection events.
+            app:                 The ASGI app to wrap.
+            token:               The configured bearer token (held in memory, never logged).
+            annall:              Optional AnnallPort for logging rejection events.
+            session_id_ref:      Mutable list[str] whose [0] element is the current
+                                 daemon Annáll session ID.  Updated by startup handler.
+                                 If None, session ID defaults to ''.
+            trust_proxy_headers: Whether to trust X-Forwarded-For for IP extraction.
+                                 Default False (B-009).
         """
         super().__init__(app)  # type: ignore[call-arg]
         self._token = token
         self._annall = annall
-        self._daemon_session_id: str = ""  # Set after daemon startup
+        # B-005: live mutable reference — no set_daemon_session_id needed
+        self._session_id_ref: list[str] = session_id_ref if session_id_ref is not None else [""]
+        self._trust_proxy_headers = trust_proxy_headers
 
     def set_daemon_session_id(self, session_id: str) -> None:
-        """Bind the daemon's Annáll session ID for event logging."""
-        self._daemon_session_id = session_id
+        """Bind the daemon's Annáll session ID for event logging.
+
+        Deprecated: prefer passing session_id_ref at construction (B-005 fix).
+        Kept for backward compatibility with any external callers.
+        """
+        self._session_id_ref[0] = session_id
 
     async def dispatch(  # type: ignore[override]
         self, request: Any, call_next: Any
@@ -88,7 +113,7 @@ class GaeslumadrMiddleware(BaseHTTPMiddleware):  # type: ignore[misc]
 
         # Token rejected — log the rejection and return 401
         request_id = request.headers.get("x-request-id", "")
-        source_ip = _get_client_ip(request)
+        source_ip = _get_client_ip(request, trust_proxy_headers=self._trust_proxy_headers)
 
         logger.warning(
             "Gæslumaðr: bearer token %s from %s (request_id=%s path=%s)",
@@ -98,7 +123,7 @@ class GaeslumadrMiddleware(BaseHTTPMiddleware):  # type: ignore[misc]
             request.url.path,
         )
 
-        _log_rejection(self._annall, self._daemon_session_id, request_id, source_ip)
+        _log_rejection(self._annall, self._session_id_ref[0], request_id, source_ip)
 
         return JSONResponse(  # type: ignore[misc]
             status_code=401,
@@ -141,12 +166,17 @@ def _tokens_match(presented: str, configured: str) -> bool:
         return False
 
 
-def _get_client_ip(request: Any) -> str:
-    """Extract client IP from request, handling proxy headers."""
+def _get_client_ip(request: Any, trust_proxy_headers: bool = False) -> str:
+    """Extract client IP from request.
+
+    B-009: X-Forwarded-For is only consulted when trust_proxy_headers=True.
+    Default behavior uses request.client.host (the actual TCP peer address).
+    """
     try:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+        if trust_proxy_headers:
+            forwarded = request.headers.get("x-forwarded-for", "")
+            if forwarded:
+                return forwarded.split(",")[0].strip()
         if request.client:
             return request.client.host
     except Exception:

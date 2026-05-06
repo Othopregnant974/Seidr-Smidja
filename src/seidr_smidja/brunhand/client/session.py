@@ -86,6 +86,7 @@ class Tengslastig:
         run_id: str | None = None,
         command_log_size: int = 200,
         output_dir: Any = None,
+        owns_client: bool = False,
     ) -> None:
         """Initialise Tengslastig.
 
@@ -98,6 +99,12 @@ class Tengslastig:
             run_id:              Optional Mode C run_id for cross-Annáll correlation.
             command_log_size:    Max commands kept in the rolling log (default 200).
             output_dir:          Optional dir for Oracle Eye render output.
+            owns_client:         B-011 fix. When True, __exit__ closes the BrunhandClient.
+                                 Set to True only when Tengslastig is the sole owner of
+                                 the client lifecycle (direct construction without an
+                                 external try/finally).  Factory paths and the
+                                 brunhand.session() wrapper manage the client themselves
+                                 so they leave this False.
         """
         self._client = client
         self.agent_id = agent_id or "Tengslastig"
@@ -107,6 +114,7 @@ class Tengslastig:
         self.run_id = run_id
         self._command_log: deque[CommandRecord] = deque(maxlen=command_log_size)
         self._output_dir = output_dir
+        self._owns_client = owns_client  # B-011
 
         # Session state — populated on __enter__
         self.session_id: str = ""
@@ -161,6 +169,7 @@ class Tengslastig:
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        import contextlib
         elapsed = time.monotonic() - self._session_start
         self._log_annall("brunhand.session.closed", {
             "session_id": self.session_id,
@@ -183,6 +192,13 @@ class Tengslastig:
             "Tengslastig: session closed — %s (%.2fs, %d commands)",
             self.session_id, elapsed, len(self._command_log),
         )
+        # B-011: Close the underlying httpx client when Tengslastig owns it.
+        # Only active when owns_client=True (direct construction without external lifecycle
+        # management).  brunhand.session() and factory.make_session_from_config() manage
+        # the client in their own try/finally blocks and leave owns_client=False.
+        if self._owns_client:
+            with contextlib.suppress(Exception):
+                self._client.close()
         # Do not suppress exceptions
         return None
 

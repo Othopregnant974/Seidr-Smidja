@@ -72,7 +72,8 @@ def main(argv: list[str] | None = None) -> None:
     # ── Safety check: refuse non-localhost without allow_remote_bind ──────────
     # Same invariant as Straumur H-005. The daemon is not secure enough to
     # expose to arbitrary networks without explicit operator consent.
-    _localhost_addresses = {"127.0.0.1", "::1", "localhost", "0.0.0.0"}
+    # B-010: 0.0.0.0 is NOT treated as localhost here — it binds all interfaces.
+    # Only the three loopback addresses are considered local-only.
     is_localhost = bind_address in ("127.0.0.1", "::1", "localhost")
 
     if not is_localhost and not allow_remote_bind:

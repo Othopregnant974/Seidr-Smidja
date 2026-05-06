@@ -96,3 +96,63 @@ class TestCliArgOverride:
              patch("seidr_smidja.brunhand.daemon.__main__._print_banner"), \
              patch("uvicorn.run"):
             main(["--host", "127.0.0.1", "--port", "9999"])
+
+
+class TestBindRefusalEdgeCases:
+    """B-016: Bind refusal edge cases — 0.0.0.0 and startup banner."""
+
+    def test_bind_0000_without_allow_remote_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """0.0.0.0 must be refused without allow_remote_bind (B-010 comment fix verified)."""
+        monkeypatch.setenv("BRUNHAND_TOKEN", "test-token")
+
+        from seidr_smidja.brunhand.daemon.__main__ import main
+
+        with patch("seidr_smidja.brunhand.daemon.__main__._check_daemon_deps"), \
+             patch("seidr_smidja.brunhand.daemon.config.load_daemon_config", return_value={
+                 "bind_address": "0.0.0.0",
+                 "port": 8848,
+                 "allow_remote_bind": False,
+                 "tls": {},
+             }), \
+             patch("seidr_smidja.brunhand.daemon.config.load_bearer_token", return_value="test-token"):
+            with pytest.raises(SystemExit) as exc_info:
+                main([])
+        # 0.0.0.0 is not localhost — should exit
+        assert exc_info.value.code != 0 or isinstance(exc_info.value.code, str)
+
+    def test_startup_banner_is_printed(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture) -> None:
+        """Startup banner must print bind address and health URL."""
+        monkeypatch.setenv("BRUNHAND_TOKEN", "test-token")
+
+        from seidr_smidja.brunhand.daemon.__main__ import main
+
+        with patch("seidr_smidja.brunhand.daemon.__main__._check_daemon_deps"), \
+             patch("seidr_smidja.brunhand.daemon.config.load_daemon_config", return_value={
+                 "bind_address": "127.0.0.1",
+                 "port": 8848,
+                 "allow_remote_bind": False,
+                 "tls": {},
+             }), \
+             patch("seidr_smidja.brunhand.daemon.config.load_bearer_token", return_value="test-token"), \
+             patch("seidr_smidja.brunhand.daemon.app.create_daemon_app", return_value=MagicMock()), \
+             patch("uvicorn.run"):
+            main([])
+
+        captured = capsys.readouterr()
+        assert "8848" in captured.out or "Horfunarþjónn" in captured.out or "health" in captured.out.lower()
+
+    def test_check_daemon_deps_exits_on_missing_pyautogui(self) -> None:
+        """_check_daemon_deps must sys.exit when pyautogui is missing."""
+        from seidr_smidja.brunhand.daemon.__main__ import _check_daemon_deps
+
+        import builtins
+        real_import = builtins.__import__
+
+        def mock_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "pyautogui":
+                raise ImportError("pyautogui not installed")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            with pytest.raises(SystemExit):
+                _check_daemon_deps()
