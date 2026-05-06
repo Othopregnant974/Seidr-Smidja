@@ -58,6 +58,9 @@ hoard_cache/
 # Annáll database (session records — local, not committed)
 annall.db
 *.annall.db
+data/annall/
+runs.sqlite
+runs.jsonl
 
 # Configuration overrides (user-local; never committed)
 config/user.yaml
