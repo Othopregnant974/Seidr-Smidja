@@ -4,6 +4,12 @@
 
 ---
 
+## 2026-05-06 — Brúarhönd v0.1 Phase 5 Complete (Eldra Járnsdóttir — Forge)
+
+*Eldra Járnsdóttir — Phase 5 lateral dispatch fully forged: `session.py` (Tengslastig), `factory.py`, `brunhand_dispatch()` in core, CLI `cmd_brunhand` group (8 subcommands), REST `POST /v1/brunhand/dispatch`, 3 MCP tools, operator tools `brunhand_daemon.py` + `verify_brunhand.py`, 144 new tests in `tests/brunhand/` — total suite 430 passed (+144 from baseline 286, target was ≥310), ruff errors at or below baseline, Python 3.10 compat confirmed.*
+
+---
+
 ## 2026-05-06 — Hardening Run Closed (Phase D — Scribe close)
 
 *Runa Gridweaver Freyjasdóttir, in the discipline of Eirwyn Rúnblóm — closing the hardening run after the spawned agents' usage budgets reset.*

@@ -410,6 +410,215 @@ def _get_hoard(hoard: Any | None, config: dict[str, Any] | None) -> Any:
     project_root = cfg.get("_project_root", ".")
     from pathlib import Path as _Path
 
-    catalog = (_Path(project_root) / hoard_cfg.get("catalog_path", "data/hoard/catalog.yaml")).resolve()
+    catalog_rel = hoard_cfg.get("catalog_path", "data/hoard/catalog.yaml")
+    catalog = (_Path(project_root) / catalog_rel).resolve()
     bases = (_Path(project_root) / hoard_cfg.get("bases_dir", "data/hoard/bases")).resolve()
     return LocalHoardAdapter(catalog_path=catalog, bases_dir=bases)
+
+
+# ─── Brúarhönd Dispatch ───────────────────────────────────────────────────────
+# brunhand_dispatch() is a LATERAL dispatch — it routes a primitive call to a
+# remote Horfunarþjónn daemon. It is a SIBLING to dispatch(), not a pipeline
+# stage inside it. The two dispatchers are independent and share only the
+# AnnallPort injection pattern (D-005).
+#
+# Mode A: brunhand_dispatch() only — VRoid host action, no forge pipeline.
+# Mode B: dispatch() only — standard forge pipeline, no VRoid host.
+# Mode C: Both, sequentially, under a shared run_id. Caller is responsible
+#         for opening the shared run_id and passing it to both dispatchers.
+
+
+@dataclass
+class BrunhandDispatchRequest:
+    """A normalized Brúarhönd dispatch request from any Bridge.
+
+    Bridges (CLI, REST, MCP) construct this from their protocol-native input
+    and call brunhand_dispatch(request, annall).
+    """
+
+    host_name: str                            # Named host from brunhand.hosts config
+    primitive: str                            # Primitive name (e.g. "screenshot")
+    primitive_args: dict[str, Any] = field(default_factory=dict)
+    agent_id: str = ""
+    run_id: str | None = None                 # Mode C cross-Annáll correlation
+    request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    config: dict[str, Any] | None = None      # Full config dict for client construction
+    token_override: str | None = None         # Token override for testing
+
+
+@dataclass
+class BrunhandDispatchResponse:
+    """The result of a brunhand_dispatch() call.
+
+    INVARIANT: brunhand_dispatch() always returns a BrunhandDispatchResponse —
+    success or failure. It never propagates exceptions to the calling Bridge.
+    """
+
+    request_id: str
+    success: bool
+    primitive: str
+    result: Any = None                        # Typed primitive result, or None on failure
+    error_type: str = ""
+    error_message: str = ""
+    host: str = ""
+    run_id: str | None = None
+    elapsed_seconds: float = 0.0
+
+
+def brunhand_dispatch(
+    request: BrunhandDispatchRequest,
+    annall: AnnallPort,
+) -> BrunhandDispatchResponse:
+    """Execute a Brúarhönd primitive call against a remote Horfunarþjónn daemon.
+
+    This is the lateral dispatch path — a sibling to dispatch(), NOT a pipeline
+    stage inside it. All Bridge sub-modules route Brúarhönd calls here.
+
+    The Core has zero awareness of which Bridge invoked it.
+
+    Args:
+        request: The normalized Brúarhönd dispatch request.
+        annall:  An AnnallPort instance (injected at startup, D-005).
+
+    Returns:
+        BrunhandDispatchResponse — always. Never raises to the calling Bridge.
+    """
+    overall_start = time.monotonic()
+
+    # Open Annáll session for this dispatch
+    session_id = annall.open_session({
+        "agent_id": request.agent_id,
+        "bridge_type": "brunhand",
+        "primitive": request.primitive,
+        "host_name": request.host_name,
+        "run_id": request.run_id,
+        "request_id": request.request_id,
+    })
+
+    cfg = request.config or {}
+
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        from seidr_smidja.brunhand.exceptions import BrunhandError
+
+        client = make_client_from_config(
+            request.host_name,
+            cfg,
+            token_override=request.token_override,
+        )
+
+        try:
+            with client:
+                result = _call_primitive(client, request.primitive, request.primitive_args)
+
+            elapsed = time.monotonic() - overall_start
+            annall.log_event(
+                session_id,
+                AnnallEvent.info("brunhand.dispatch.completed", {
+                    "primitive": request.primitive,
+                    "host_name": request.host_name,
+                    "run_id": request.run_id,
+                    "elapsed_ms": elapsed * 1000,
+                }),
+            )
+            annall.close_session(
+                session_id,
+                SessionOutcome(
+                    success=True,
+                    summary=f"{request.primitive} completed",
+                    elapsed_seconds=elapsed,
+                ),
+            )
+            return BrunhandDispatchResponse(
+                request_id=request.request_id,
+                success=True,
+                primitive=request.primitive,
+                result=result,
+                host=getattr(client, "host", request.host_name),
+                run_id=request.run_id,
+                elapsed_seconds=elapsed,
+            )
+        except BrunhandError as exc:
+            elapsed = time.monotonic() - overall_start
+            annall.log_event(
+                session_id,
+                AnnallEvent.error("brunhand.dispatch.failed", {
+                    "primitive": request.primitive,
+                    "host_name": request.host_name,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                }),
+            )
+            annall.close_session(
+                session_id,
+                SessionOutcome(success=False, summary=str(exc), elapsed_seconds=elapsed),
+            )
+            return BrunhandDispatchResponse(
+                request_id=request.request_id,
+                success=False,
+                primitive=request.primitive,
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+                run_id=request.run_id,
+                elapsed_seconds=elapsed,
+            )
+
+    except Exception as exc:
+        elapsed = time.monotonic() - overall_start
+        annall.log_event(
+            session_id,
+            AnnallEvent.error("brunhand.dispatch.exception", {
+                "primitive": request.primitive,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            }),
+        )
+        annall.close_session(
+            session_id,
+            SessionOutcome(success=False, summary=str(exc), elapsed_seconds=elapsed),
+        )
+        return BrunhandDispatchResponse(
+            request_id=request.request_id,
+            success=False,
+            primitive=request.primitive,
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            run_id=request.run_id,
+            elapsed_seconds=elapsed,
+        )
+
+
+def _call_primitive(client: Any, primitive: str, args: dict[str, Any]) -> Any:
+    """Dispatch a named primitive call on a BrunhandClient.
+
+    Maps primitive name strings to the corresponding client method.
+    Raises AttributeError if the primitive is unknown.
+    """
+    primitive_map: dict[str, str] = {
+        "screenshot": "screenshot",
+        "click": "click",
+        "move": "move",
+        "drag": "drag",
+        "scroll": "scroll",
+        "type_text": "type_text",
+        "hotkey": "hotkey",
+        "find_window": "find_window",
+        "wait_for_window": "wait_for_window",
+        "vroid_export_vrm": "vroid_export_vrm",
+        "vroid_save_project": "vroid_save_project",
+        "vroid_open_project": "vroid_open_project",
+        "health": "health",
+        "capabilities": "capabilities",
+    }
+
+    method_name = primitive_map.get(primitive)
+    if method_name is None:
+        from seidr_smidja.brunhand.exceptions import BrunhandCapabilityError
+        raise BrunhandCapabilityError(
+            f"Unknown Brúarhönd primitive: '{primitive}'. "
+            f"Available primitives: {sorted(primitive_map.keys())}",
+            primitive_name=primitive,
+        )
+
+    method = getattr(client, method_name)
+    return method(**args)

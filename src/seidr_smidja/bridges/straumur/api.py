@@ -69,6 +69,17 @@ class InspectRequestBody(_BaseModel):  # type: ignore[misc]
     targets: list[str] | None = None
 
 
+class BrunhandDispatchBody(_BaseModel):  # type: ignore[misc]
+    """Request body for POST /v1/brunhand/dispatch."""
+
+    host_name: str
+    primitive: str
+    primitive_args: dict[str, Any] = {}
+    agent_id: str = ""
+    run_id: str | None = None
+    token: str | None = None  # Optional per-request token override
+
+
 # ─── App factory ─────────────────────────────────────────────────────────────
 
 
@@ -349,6 +360,66 @@ def create_app(config: dict[str, Any] | None = None) -> Any:
         except Exception as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 
+    # ── Brúarhönd dispatch endpoint ───────────────────────────────────────────
+    # POST /v1/brunhand/dispatch — Mode A/C lateral VRoid primitive dispatch
+    # Mode A: brunhand primitive only (no forge pipeline)
+    # Mode C: caller supplies a run_id to correlate with a parallel dispatch() call
+
+    @app.post("/v1/brunhand/dispatch")
+    async def brunhand_dispatch_endpoint(body: BrunhandDispatchBody) -> JSONResponse:  # type: ignore[misc]
+        """Dispatch a Brúarhönd primitive to a remote Horfunarþjónn daemon.
+
+        Mode A: brunhand only — performs the primitive, returns the result.
+        Mode C: caller passes a run_id shared with a concurrent /v1/avatars call.
+
+        Authentication to the daemon is via BRUNHAND_TOKEN env var or the host
+        entry in brunhand.hosts config (not this endpoint's bearer token).
+        """
+        from seidr_smidja.bridges.core.dispatch import BrunhandDispatchRequest, brunhand_dispatch
+
+        cfg = _get_config()
+        annall = _get_annall()
+
+        request = BrunhandDispatchRequest(
+            host_name=body.host_name,
+            primitive=body.primitive,
+            primitive_args=body.primitive_args,
+            agent_id=body.agent_id or "straumur",
+            run_id=body.run_id,
+            request_id=str(uuid.uuid4()),
+            config=cfg,
+            token_override=body.token,
+        )
+
+        response = brunhand_dispatch(request, annall)
+
+        result: dict[str, Any] = {
+            "success": response.success,
+            "request_id": response.request_id,
+            "primitive": response.primitive,
+            "host": response.host,
+            "run_id": response.run_id,
+            "elapsed_seconds": response.elapsed_seconds,
+        }
+        if response.success and response.result is not None:
+            # Serialize the result — convert dataclass to dict safely
+            try:
+                import dataclasses
+                if dataclasses.is_dataclass(response.result):
+                    result["result"] = dataclasses.asdict(response.result)
+                elif hasattr(response.result, "__dict__"):
+                    result["result"] = response.result.__dict__
+                else:
+                    result["result"] = response.result
+            except Exception:
+                result["result"] = str(response.result)
+        else:
+            result["error_type"] = response.error_type
+            result["error_message"] = response.error_message
+
+        status_code = 200 if response.success else 422
+        return JSONResponse(content=result, status_code=status_code)
+
     return app
 
 
@@ -367,6 +438,7 @@ else:
 
 if __name__ == "__main__":
     import uvicorn  # type: ignore[import]
+
     from seidr_smidja.config import load_config  # noqa: E402  (local import in __main__)
 
     # H-005: Default to localhost-only binding.

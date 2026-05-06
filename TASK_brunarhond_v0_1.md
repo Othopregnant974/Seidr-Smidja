@@ -158,12 +158,12 @@ The translation layer above primitives (Loom YAML → automatic VRoid UI navigat
 
 | Phase | Role | Status | Commit |
 |---|---|---|---|
-| 0 — TASK file | Runa | IN PROGRESS | (this commit) |
-| 1 — Vision | Skald | PENDING | — |
-| 2 — Bones | Architect | PENDING | — |
-| 3 — Rivers | Cartographer | PENDING | — |
-| 4 — Memory mid-ritual | Scribe | PENDING | — |
-| 5 — First Forging | Forge Worker | PENDING | — |
+| 0 — TASK file | Runa | COMPLETE | eca05f2 |
+| 1 — Vision | Skald | COMPLETE | 5c05a9e |
+| 2 — Bones | Architect | COMPLETE | 0697837 |
+| 3 — Rivers | Cartographer | COMPLETE | 6be9934 |
+| 4 — Memory mid-ritual | Scribe | COMPLETE | 0af8691 |
+| 5 — First Forging | Forge Worker | COMPLETE | (pending commit — 430 tests, 144 new) |
 | 6 — Verification | Auditor | PENDING | — |
 | 7 — Closing | Scribe | PENDING | — |
 

@@ -386,6 +386,357 @@ def cmd_version() -> None:
     click.echo(f"seidr-smidja {_get_version()}")
 
 
+@cli.group("brunhand")
+def cmd_brunhand() -> None:
+    """Brúarhönd — remote VRoid Studio control.
+
+    Commands for operating a Horfunarþjónn daemon on a remote VRoid Studio host.
+
+    \b
+    Requires BRUNHAND_TOKEN environment variable (or --token flag).
+    Requires --host <name> flag matching an entry in brunhand.hosts config.
+
+    \b
+    Examples:
+        seidr brunhand health --host vroid-win
+        seidr brunhand screenshot --host vroid-win --out ./caps/screen.png
+        seidr brunhand click --host vroid-win 640 400
+        seidr brunhand hotkey --host vroid-win ctrl s
+        seidr brunhand vroid-export --host vroid-win --out character.vrm
+    """
+
+
+def _brunhand_common(
+    host: str, token: str | None, config_path: str | None,
+) -> tuple[Any, Any, str, Any]:
+    """Shared setup for all brunhand subcommands.
+
+    Returns (client, config, resolved_token, project_root).
+    """
+    project_root = _find_project_root()
+    config = _load_config(config_path, project_root)
+
+    # Resolve token: flag > env > config
+    resolved_token = token or ""
+    if not resolved_token:
+        import os
+        env_key = f"BRUNHAND_TOKEN_{host.upper().replace('-', '_').replace('.', '_')}"
+        resolved_token = os.environ.get(env_key, "") or os.environ.get("BRUNHAND_TOKEN", "")
+
+    return config, resolved_token, project_root
+
+
+@cmd_brunhand.command("health")
+@click.option("--host", required=True, help="Named host from brunhand.hosts config.")
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN", help="Bearer token.")
+@click.option("--config", "config_path", default=None)
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_health(
+    host: str, token: str | None, config_path: str | None, output_json: bool,
+) -> None:
+    """Health check against a Brúarhönd daemon."""
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.health()
+        if output_json:
+            click.echo(json.dumps({
+                "status": result.status,
+                "daemon_version": result.daemon_version,
+                "os_name": result.os_name,
+                "uptime_seconds": result.uptime_seconds,
+            }))
+        else:
+            up = f"{result.uptime_seconds:.0f}s"
+            click.echo(
+                f"Daemon {host}: {result.status}"
+                f" (v{result.daemon_version}, {result.os_name}, up {up})"
+            )
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
+@cmd_brunhand.command("capabilities")
+@click.option("--host", required=True, help="Named host from brunhand.hosts config.")
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN")
+@click.option("--config", "config_path", default=None)
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_capabilities(
+    host: str, token: str | None, config_path: str | None, output_json: bool,
+) -> None:
+    """Show capability manifest from a Brúarhönd daemon."""
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.capabilities()
+        if output_json:
+            click.echo(json.dumps({
+                "daemon_version": result.daemon_version,
+                "os_name": result.os_name,
+                "primitives": result.primitives,
+            }, indent=2))
+        else:
+            click.echo(f"Daemon {host} capabilities (v{result.daemon_version}, {result.os_name}):")
+            for name, info in sorted(result.primitives.items()):
+                avail = "available" if info.get("available") else "unavailable"
+                click.echo(f"  {name}: {avail}")
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
+@cmd_brunhand.command("screenshot")
+@click.option("--host", required=True, help="Named host from brunhand.hosts config.")
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN")
+@click.option("--config", "config_path", default=None)
+@click.option("--out", "out_path", default=None, type=click.Path(), help="Save PNG to this path.")
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_screenshot(
+    host: str, token: str | None, config_path: str | None,
+    out_path: str | None, output_json: bool,
+) -> None:
+    """Capture a screenshot from the remote VRoid host."""
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.screenshot()
+        if out_path and result.png_bytes:
+            Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(out_path).write_bytes(result.png_bytes)
+        if output_json:
+            click.echo(json.dumps({
+                "success": result.success,
+                "width": result.width, "height": result.height,
+                "captured_at": result.captured_at,
+                "saved_to": out_path,
+                "byte_count": len(result.png_bytes),
+            }))
+        else:
+            saved = f" → {out_path}" if out_path else ""
+            click.echo(
+                f"Screenshot: {result.width}x{result.height}"
+                f" ({len(result.png_bytes)} bytes){saved}"
+            )
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
+@cmd_brunhand.command("click")
+@click.argument("x", type=int)
+@click.argument("y", type=int)
+@click.option("--host", required=True)
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN")
+@click.option("--config", "config_path", default=None)
+@click.option("--button", default="left", type=click.Choice(["left", "right", "middle"]))
+@click.option("--clicks", default=1, type=int)
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_click(
+    x: int, y: int, host: str, token: str | None, config_path: str | None,
+    button: str, clicks: int, output_json: bool,
+) -> None:
+    """Send a mouse click to the remote VRoid host."""
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.click(x=x, y=y, button=button, clicks=clicks)
+        if output_json:
+            click.echo(json.dumps({"success": result.success, "x": result.x, "y": result.y}))
+        else:
+            click.echo(f"Clicked ({result.x}, {result.y}) button={button} x{clicks}")
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
+@cmd_brunhand.command("type")
+@click.argument("text")
+@click.option("--host", required=True)
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN")
+@click.option("--config", "config_path", default=None)
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_type(
+    text: str, host: str, token: str | None, config_path: str | None, output_json: bool,
+) -> None:
+    """Type text on the remote VRoid host."""
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.type_text(text=text)
+        if output_json:
+            click.echo(json.dumps({
+                "success": result.success,
+                "characters_typed": result.characters_typed,
+            }))
+        else:
+            click.echo(f"Typed {result.characters_typed} chars")
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
+@cmd_brunhand.command("hotkey")
+@click.argument("keys", nargs=-1, required=True)
+@click.option("--host", required=True)
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN")
+@click.option("--config", "config_path", default=None)
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_hotkey(
+    keys: tuple[str, ...], host: str, token: str | None,
+    config_path: str | None, output_json: bool,
+) -> None:
+    """Send a hotkey combination to the remote VRoid host.
+
+    \b
+    Examples:
+        seidr brunhand hotkey --host vroid-win ctrl s
+        seidr brunhand hotkey --host vroid-win ctrl shift e
+    """
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.hotkey(keys=list(keys))
+        if output_json:
+            click.echo(json.dumps({"success": result.success, "keys": result.keys}))
+        else:
+            click.echo(f"Hotkey: {'+'.join(result.keys)}")
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
+@cmd_brunhand.command("vroid-open")
+@click.argument("project_path")
+@click.option("--host", required=True)
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN")
+@click.option("--config", "config_path", default=None)
+@click.option("--timeout", "wait_timeout", default=60.0, type=float)
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_vroid_open(
+    project_path: str, host: str, token: str | None, config_path: str | None,
+    wait_timeout: float, output_json: bool,
+) -> None:
+    """Open a VRoid project file on the remote VRoid host."""
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.vroid_open_project(
+                project_path=project_path, wait_timeout_seconds=wait_timeout,
+            )
+        if output_json:
+            click.echo(json.dumps({
+                "success": result.success,
+                "opened_path": result.opened_path,
+                "elapsed_seconds": result.elapsed_seconds,
+            }))
+        else:
+            click.echo(f"Opened: {result.opened_path} ({result.elapsed_seconds:.1f}s)")
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
+@cmd_brunhand.command("vroid-export")
+@click.option("--host", required=True)
+@click.option("--out", "output_path", required=True, help="Output VRM path on the daemon host.")
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN")
+@click.option("--config", "config_path", default=None)
+@click.option("--timeout", "wait_timeout", default=120.0, type=float)
+@click.option("--no-overwrite", "no_overwrite", is_flag=True, default=False)
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_vroid_export(
+    host: str, output_path: str, token: str | None, config_path: str | None,
+    wait_timeout: float, no_overwrite: bool, output_json: bool,
+) -> None:
+    """Export a VRM from VRoid Studio on the remote host."""
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.vroid_export_vrm(
+                output_path=output_path, overwrite=not no_overwrite,
+                wait_timeout_seconds=wait_timeout,
+            )
+        if output_json:
+            click.echo(json.dumps({"success": result.success, "exported_path": result.exported_path,
+                                   "elapsed_seconds": result.elapsed_seconds}))
+        else:
+            click.echo(f"Exported: {result.exported_path} ({result.elapsed_seconds:.1f}s)")
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
+@cmd_brunhand.command("vroid-save")
+@click.option("--host", required=True)
+@click.option("--token", default=None, envvar="BRUNHAND_TOKEN")
+@click.option("--config", "config_path", default=None)
+@click.option("--json", "output_json", is_flag=True, default=False)
+def brunhand_vroid_save(
+    host: str, token: str | None, config_path: str | None, output_json: bool,
+) -> None:
+    """Save the current VRoid project on the remote host (Ctrl+S)."""
+    config, resolved_token, _root = _brunhand_common(host, token, config_path)
+    try:
+        from seidr_smidja.brunhand.client.factory import make_client_from_config
+        client = make_client_from_config(host, config, token_override=resolved_token or None)
+        with client:
+            result = client.vroid_save_project()
+        if output_json:
+            click.echo(json.dumps({
+                "success": result.success,
+                "elapsed_seconds": result.elapsed_seconds,
+            }))
+        else:
+            click.echo(f"Saved ({result.elapsed_seconds:.1f}s)")
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: {exc}", err=True)
+        sys.exit(1)
+
+
 def main() -> None:
     """Console script entry point."""
     cli(standalone_mode=True)

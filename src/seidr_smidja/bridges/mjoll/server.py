@@ -117,6 +117,86 @@ def build_mcp_server(config: dict[str, Any] | None = None) -> Any:
                     "required": ["vrm_path"],
                 },
             ),
+            # ── Brúarhönd tools ───────────────────────────────────────────────
+            mcp_types.Tool(  # type: ignore[misc]
+                name="seidr.brunhand_screenshot",
+                description=(
+                    "Capture a screenshot from a remote VRoid Studio host via Brúarhönd. "
+                    "Returns base64-encoded PNG bytes, width, height, and capture timestamp. "
+                    "Requires a configured brunhand.hosts entry and BRUNHAND_TOKEN."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "host_name": {
+                            "type": "string",
+                            "description": "Named host entry from brunhand.hosts config",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Agent identifier for telemetry (optional)",
+                        },
+                    },
+                    "required": ["host_name"],
+                },
+            ),
+            mcp_types.Tool(  # type: ignore[misc]
+                name="seidr.brunhand_click",
+                description=(
+                    "Send a mouse click to a remote VRoid Studio host via Brúarhönd. "
+                    "Coordinates are in screen pixels on the daemon's display. "
+                    "Requires a configured brunhand.hosts entry and BRUNHAND_TOKEN."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "host_name": {"type": "string", "description": "Named host from config"},
+                        "x": {"type": "integer", "description": "Screen X coordinate"},
+                        "y": {"type": "integer", "description": "Screen Y coordinate"},
+                        "button": {
+                            "type": "string",
+                            "enum": ["left", "right", "middle"],
+                            "description": "Mouse button (default: left)",
+                        },
+                        "clicks": {
+                            "type": "integer",
+                            "description": "Number of clicks (default: 1)",
+                        },
+                        "agent_id": {"type": "string"},
+                    },
+                    "required": ["host_name", "x", "y"],
+                },
+            ),
+            mcp_types.Tool(  # type: ignore[misc]
+                name="seidr.brunhand_vroid_export",
+                description=(
+                    "Export a VRM file from VRoid Studio on a remote host via Brúarhönd. "
+                    "Triggers the VRoid Studio export dialog, waits for completion, "
+                    "and returns the exported file path. "
+                    "VRoid Studio must be running and have a project open. "
+                    "Requires a configured brunhand.hosts entry and BRUNHAND_TOKEN."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "host_name": {"type": "string", "description": "Named host from config"},
+                        "output_path": {
+                            "type": "string",
+                            "description": "VRM output path on the daemon's filesystem",
+                        },
+                        "overwrite": {
+                            "type": "boolean",
+                            "description": "Overwrite if file exists (default: true)",
+                        },
+                        "wait_timeout_seconds": {
+                            "type": "number",
+                            "description": "Max seconds to wait for export dialog (default: 120)",
+                        },
+                        "agent_id": {"type": "string"},
+                    },
+                    "required": ["host_name", "output_path"],
+                },
+            ),
         ]
 
     @server.call_tool()  # type: ignore[misc]
@@ -125,6 +205,12 @@ def build_mcp_server(config: dict[str, Any] | None = None) -> Any:
             return await _handle_build_avatar(arguments, config)
         elif name == "seidr.inspect_vrm":
             return await _handle_inspect_vrm(arguments, config)
+        elif name == "seidr.brunhand_screenshot":
+            return await _handle_brunhand_screenshot(arguments, config)
+        elif name == "seidr.brunhand_click":
+            return await _handle_brunhand_click(arguments, config)
+        elif name == "seidr.brunhand_vroid_export":
+            return await _handle_brunhand_vroid_export(arguments, config)
         else:
             return [
                 mcp_types.TextContent(  # type: ignore[misc]
@@ -253,6 +339,134 @@ async def _handle_inspect_vrm(arguments: dict[str, Any], config: dict[str, Any] 
         }
     except Exception as exc:
         result = {"error": str(exc), "passed": False}
+
+    return [mcp_types.TextContent(type="text", text=json.dumps(result, indent=2))]  # type: ignore[misc]
+
+
+async def _handle_brunhand_screenshot(
+    arguments: dict[str, Any], config: dict[str, Any] | None,
+) -> list[Any]:
+    """Handle seidr.brunhand_screenshot MCP tool call."""
+    import base64
+
+    from seidr_smidja.annall.adapters.null import NullAnnallAdapter
+    from seidr_smidja.bridges.core.dispatch import BrunhandDispatchRequest, brunhand_dispatch
+
+    cfg = config or {}
+    annall = NullAnnallAdapter()
+
+    request = BrunhandDispatchRequest(
+        host_name=arguments["host_name"],
+        primitive="screenshot",
+        primitive_args={},
+        agent_id=arguments.get("agent_id", "mcp_client"),
+        config=cfg,
+    )
+    response = brunhand_dispatch(request, annall)
+
+    result: dict[str, Any] = {
+        "success": response.success,
+        "primitive": "screenshot",
+        "host": response.host,
+        "elapsed_seconds": response.elapsed_seconds,
+    }
+    if response.success and response.result is not None:
+        r = response.result
+        png_bytes = getattr(r, "png_bytes", b"")
+        result["width"] = getattr(r, "width", 0)
+        result["height"] = getattr(r, "height", 0)
+        result["captured_at"] = getattr(r, "captured_at", "")
+        result["byte_count"] = len(png_bytes)
+        result["png_b64"] = base64.b64encode(png_bytes).decode("ascii") if png_bytes else ""
+    else:
+        result["error_type"] = response.error_type
+        result["error_message"] = response.error_message
+
+    return [mcp_types.TextContent(type="text", text=json.dumps(result, indent=2))]  # type: ignore[misc]
+
+
+async def _handle_brunhand_click(
+    arguments: dict[str, Any], config: dict[str, Any] | None,
+) -> list[Any]:
+    """Handle seidr.brunhand_click MCP tool call."""
+    from seidr_smidja.annall.adapters.null import NullAnnallAdapter
+    from seidr_smidja.bridges.core.dispatch import BrunhandDispatchRequest, brunhand_dispatch
+
+    cfg = config or {}
+    annall = NullAnnallAdapter()
+
+    primitive_args = {
+        "x": arguments["x"],
+        "y": arguments["y"],
+        "button": arguments.get("button", "left"),
+        "clicks": arguments.get("clicks", 1),
+    }
+
+    request = BrunhandDispatchRequest(
+        host_name=arguments["host_name"],
+        primitive="click",
+        primitive_args=primitive_args,
+        agent_id=arguments.get("agent_id", "mcp_client"),
+        config=cfg,
+    )
+    response = brunhand_dispatch(request, annall)
+
+    result: dict[str, Any] = {
+        "success": response.success,
+        "primitive": "click",
+        "host": response.host,
+        "elapsed_seconds": response.elapsed_seconds,
+    }
+    if response.success and response.result is not None:
+        r = response.result
+        result["x"] = getattr(r, "x", arguments["x"])
+        result["y"] = getattr(r, "y", arguments["y"])
+        result["clicks_delivered"] = getattr(r, "clicks_delivered", 1)
+    else:
+        result["error_type"] = response.error_type
+        result["error_message"] = response.error_message
+
+    return [mcp_types.TextContent(type="text", text=json.dumps(result, indent=2))]  # type: ignore[misc]
+
+
+async def _handle_brunhand_vroid_export(
+    arguments: dict[str, Any], config: dict[str, Any] | None,
+) -> list[Any]:
+    """Handle seidr.brunhand_vroid_export MCP tool call."""
+    from seidr_smidja.annall.adapters.null import NullAnnallAdapter
+    from seidr_smidja.bridges.core.dispatch import BrunhandDispatchRequest, brunhand_dispatch
+
+    cfg = config or {}
+    annall = NullAnnallAdapter()
+
+    primitive_args = {
+        "output_path": arguments["output_path"],
+        "overwrite": arguments.get("overwrite", True),
+        "wait_timeout_seconds": float(arguments.get("wait_timeout_seconds", 120.0)),
+    }
+
+    request = BrunhandDispatchRequest(
+        host_name=arguments["host_name"],
+        primitive="vroid_export_vrm",
+        primitive_args=primitive_args,
+        agent_id=arguments.get("agent_id", "mcp_client"),
+        config=cfg,
+    )
+    response = brunhand_dispatch(request, annall)
+
+    result: dict[str, Any] = {
+        "success": response.success,
+        "primitive": "vroid_export_vrm",
+        "host": response.host,
+        "elapsed_seconds": response.elapsed_seconds,
+    }
+    if response.success and response.result is not None:
+        r = response.result
+        result["exported_path"] = getattr(r, "exported_path", arguments["output_path"])
+        result["steps_executed"] = getattr(r, "steps_executed", [])
+    else:
+        result["error_type"] = response.error_type
+        result["error_message"] = response.error_message
 
     return [mcp_types.TextContent(type="text", text=json.dumps(result, indent=2))]  # type: ignore[misc]
 
