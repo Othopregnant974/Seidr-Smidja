@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+
+# Distribution / build
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# Type checker caches
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.orig
+
+# Forge outputs
+out/
+output/
+
+# Blender artifacts
+*.blend1
+*.blend2
+*.blend.bak
+*.blend@
+
+# VRM build outputs (outputs in out/ are ignored above; this catches strays)
+*.vrm.bak
+
+# Hoard cache (locally fetched assets — not committed; seeded by first-run or CI)
+src/seidr_smidja/hoard/cache/
+hoard_cache/
+
+# Annáll database (session records — local, not committed)
+annall.db
+*.annall.db
+
+# Configuration overrides (user-local; never committed)
+config/user.yaml
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+~$*
