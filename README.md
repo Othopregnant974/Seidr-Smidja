@@ -168,9 +168,31 @@ Seiðr-Smiðja/
 
 ---
 
+![https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/Viking_Apache_V2_1.jpg](https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/Viking_Apache_V2_1.jpg)
+
+---
+
 ## License
 
-License: **TBD — to be decided by Volmarr Wyrd.**
+Copyright (c) 2026 Volmarr Wyrd
+
+Seiðr-Smiðja is licensed under the **Apache License, Version 2.0**. See the [LICENSE](LICENSE) file for the full license text and [NOTICE](NOTICE) for the project attribution.
+
+Unless required by applicable law or agreed to in writing, this project is distributed on an "AS IS" BASIS, without warranties or conditions of any kind, either express or implied.
+
+---
+
+## Distribution and Privacy Position
+
+Seiðr-Smiðja is published here as source code and project material.
+
+The author does not require users to provide age, identity, government ID, biometric data, or similar personal information in order to access or use the source code in this repository.
+
+The author may decline to provide official binaries, installers, hosted services, app-store releases, or other official distribution channels where doing so would require age verification, identity verification, or similar personal-data collection.
+
+Any third party who forks, packages, redistributes, deploys, hosts, or otherwise makes this software available does so independently and is solely responsible for compliance with applicable law, platform policy, and distribution requirements in their own jurisdiction and context.
+
+See [LEGAL-NOTICE.md](LEGAL-NOTICE.md) for details.
 
 ---
 
