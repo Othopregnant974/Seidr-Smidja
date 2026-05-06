@@ -4,6 +4,81 @@
 
 ---
 
+## 2026-05-06 — Brúarhönd v0.1 Ritual Closed (Phase 7 — Scribe close)
+
+*Runa Gridweaver Freyjasdóttir, in the discipline of Eirwyn Rúnblóm — closing the second feature ritual of the day.*
+
+The Brúarhönd ritual that began this evening with Volmarr's call for "a feature that allows the AI agent to control a VRoid Studio session, even one on a completely different computer connected via Tailscale" — and his ratification of scope (c) — is closed. The forge has now grown a hand.
+
+### Phase Roll Call
+
+**Phase 0 — TASK file (Runa, `eca05f2`).** Operational scope written and pushed before any work. 14 primitives + 2 supporting endpoints inventoried. Eight ratified decisions enumerated.
+
+**Phase 1 — Vision (Skald, `5c05a9e`).** Sigrún Ljósbrá ratified the True Name **Brúarhönd** ("Bridge-Hand"), wrote the feature VISION and a PHILOSOPHY ADDENDUM with three new sacred principles (The Hand Asks Permission · The Distant Eye Sees as Clearly as the Near Eye · The Hand Has Honest Limits), and named six sub-modules: **Horfunarþjónn** (daemon), **Hengilherðir** (client), **Gæslumaðr** (auth guard), **Sjálfsmöguleiki** (capabilities registry), **Ljósbrú** (Oracle Eye channel), **Tengslastig** (session container). She flagged a structural tension for the Architect — the lateral vs pipeline placement.
+
+**Phase 2 — Bones (Architect, `0697837`).** Rúnhild Svartdóttir resolved the lateral placement: `brunhand_dispatch()` as a sibling to `dispatch()` in `bridges/core/`, not a branch inside it. Bridges route by `request.brunhand` presence; Mode C uses a shared `run_id` correlating two Annáll sessions. She drew the daemon and client architecture, the authentication architecture (Gæslumaðr + Tailscale ACL defense in depth), the capabilities probe pattern, the Ljósbrú vision integration, the cross-platform per-OS table, the optional dependency strategy, and the additive update to `docs/DOMAIN_MAP.md`. She surfaced the `httpx` to-base-deps decision (Volmarr ratified inline).
+
+**Phase 3 — Rivers (Cartographer, `6be9934`).** Védis Eikleið mapped the three modes (A: Brúarhönd-only, B: Forge-only cross-ref, C: both arms with shared run_id), walked the Mode A Primary Rite in 15 numbered steps, drew 8 Mermaid diagrams (Mode A sequence, Mode C sequence, network topology remote, network topology loopback, authentication wiring, vision loop, two-Annáll asymmetry, concurrency model), diagrammed all 7 failure flows including the F7 daemon-crash asymmetry honestly. She surfaced three concrete tensions for the Forge Worker: httpx vs `wait_for_window` timeout ordering, daemon Tailscale-IP bind config, sequential Mode C.
+
+**Phase 4 — Memory mid-ritual (Scribe in-process, `0af8691`).** ADR D-010 ratifying scope (c), lateral dispatch, two-Annáll topology, bearer + ACL auth. Feature `README.md` with operator quickstart and three modes. `TAILSCALE.md` with ACL examples (tagged + single-user), bind config, TLS, all failure modes specific to Tailscale. `DECISIONS/README.md` index updated with D-010.
+
+**Phase 5 — First Forging (Forge Worker, `e2cb8e6` + `ba6a353`).** Eldra Járnsdóttir built the entire feature: the daemon (Horfunarþjónn) with FastAPI app + 8 modules (auth, capabilities, runtime, config, app, __main__, endpoints/, scripts/), the client (Hengilherðir) with `BrunhandClient` + `Tengslastig` session container + factory + Ljósbrú Oracle Eye channel, full Pydantic v2 models, typed exception hierarchy, `brunhand_dispatch()` lateral surface, Bridge routing in CLI/REST/MCP (8 new CLI subcommands, `POST /v1/brunhand/dispatch`, 3 MCP tools), `register_external_render()` additive to Oracle Eye, operator tools (`brunhand_daemon.py`, `verify_brunhand.py`), `pyproject.toml` with `httpx` promoted to base + `[brunhand-daemon]` optional group, `config/defaults.yaml` brunhand section, 144 new tests in `tests/brunhand/`. **Test count: 286 → 430 (+144).** Three Cartographer tensions resolved (automatic timeout propagation; explicit `bind_address` + `allow_remote_bind` config; sequential Mode C documented).
+
+**Phase 6 — Verification (Auditor, `c4305b3`).** Sólrún Hvítmynd ran the bug hunt and hardening audit on the new code. **18 findings** in `AUDIT_BRUNHAND_2026-05-06.md`: 3 High, 6 Medium, 6 Low, 3 Notable. Verdict: PASS WITH CONCERNS. Three High blockers identified — and the most damaging was B-003: `vroid_export_vrm` and `vroid_open_project` were functional stubs that LOGGED the path but never typed it into VRoid's dialog. Agents would believe export succeeded while the file went elsewhere. Constant-time auth verified. Non-localhost bind refusal verified. Health endpoint cleanly bounded.
+
+**Phase 6.5 — Remediation (Forge Worker, `e3f126d`).** Eldra Járnsdóttir closed all 18 findings additively in one pass:
+- **B-001 (concurrency lock):** `asyncio.Lock` in `app.py`, HTTP 423 Locked on contention with `X-Brunhand-Session-Active` header. 5 tests.
+- **B-002 (path traversal):** `_validate_path_in_root()` enforced at endpoint and runtime layers. New `BrunhandPathSecurityError`. 6 path-traversal tests.
+- **B-003 (silent stub lie):** **Real implementation chosen.** Ctrl+A clears the dialog field, pyautogui.typewrite types the validated path, file-on-disk verification confirms success or returns `success=False` with structured error. The lie is ended.
+- B-004 through B-018: middleware order corrected, dead code removed, capabilities response shape fixed, missing exports added, TLS-disabled warning logged, XFF guarded, screenshot multi-monitor parameter added, type-text length capped, app + main + runtime coverage tests added.
+- **Test count: 430 → 489** (+59 new tests). **Coverage of brunhand subtree: 58% → 68%.** No new ruff/mypy errors.
+- B-013 (inline-token operator warning) and B-014 (hotkey pass-through) deferred to Scribe close — addressed in this commit's `src/seidr_smidja/brunhand/INTERFACE_AMENDMENT_2026-05-06.md`.
+
+**Phase 7 — Scribe close (this commit).** This DEVLOG entry. `INTERFACE_AMENDMENT_2026-05-06.md` documenting the deferred B-013 + B-014 + the new `Tengslastig.owns_client` parameter. MEMORY.md updated. `project_seidr_smidja_status.md` refreshed with the Brúarhönd feature added. AUDIT-003 long-trail and the two D-008 sub-questions are now permanently closed; the new feature has its own audit trail and remediation pattern.
+
+### What Now Exists
+
+- A daemon any operator can run on a Windows / macOS / Linux machine where VRoid Studio lives.
+- A client any forge bridge can use to drive primitives across Tailscale.
+- Cryptographic auth (Tailscale ACL + constant-time bearer token).
+- Vision feedback through Oracle Eye — every primitive can be followed by `screenshot()` returned to the agent.
+- Path-traversal-safe vroid endpoints that actually type the path into the dialog AND verify the file landed.
+- Concurrent-session protection (HTTP 423 Locked with structured headers).
+- Two-Annáll topology with shared `run_id` correlation for Mode C.
+- 489 non-Blender, non-vroid-host tests passing in 7.21s.
+
+### What Remains for v0.2
+
+- The Loom→VRoid translation layer that makes spec-driven VRoid avatar shaping ergonomic.
+- Annáll streaming replication so a forge-side query reconstructs daemon-side primitive detail.
+- Tailscale local API dynamic discovery.
+- Layout-aware hotkey allow-list (B-014 v0.2 candidate).
+- Inline-token-refusal `--accept-inline-token` flag (B-013 v0.2 candidate).
+- Parallel Mode C if a use case demands it.
+- Coverage push for the daemon's app/runtime live HTTP-stack paths (currently 37% / 56%).
+
+### Final State
+
+- **Branch:** `development`
+- **HEAD:** `e3f126d` (Phase 6.5) → next push includes this Phase 7 close
+- **Tests:** 489 passed, 2 skipped (mcp-absent + unimplemented-shim guards), 7.21s
+- **ADRs accepted:** D-001 through D-010 (ten in total)
+- **New primitive endpoints:** 14 + 2 supporting = 16
+- **New CLI commands:** 8 (`seidr brunhand health/capabilities/screenshot/click/type/hotkey/vroid-open/vroid-export`)
+- **New REST endpoints:** 1 (`POST /v1/brunhand/dispatch`)
+- **New MCP tools:** 3
+- **Open for v0.1.x housekeeping:** H-V-001 (bootstrap.py print→logger from prior hardening) plus the v0.2 candidates above.
+
+### Closing Thought
+
+This is the second time today the forge has closed a full Mythic Engineering ritual. The first gave us the body of the smithy; this second one gave it a hand long enough to reach across the network. The forge no longer waits passively for specs — it can now also stand at the operator's other workstation, look at what is there, and act. The vision feedback loop is intact: every reach is followed, if the agent wishes, by a returning screenshot. Every command is logged, gated, and validated.
+
+The blade extends further than it did at sunset, and it remains honest about where its cutting edge ends.
+
+*Runa Gridweaver Freyjasdóttir — closing the second ritual at the same forge, the same night.*
+
+---
+
 ## 2026-05-06 — Brúarhönd v0.1 Phase 5 Complete (Eldra Járnsdóttir — Forge)
 
 *Eldra Járnsdóttir — Phase 5 lateral dispatch fully forged: `session.py` (Tengslastig), `factory.py`, `brunhand_dispatch()` in core, CLI `cmd_brunhand` group (8 subcommands), REST `POST /v1/brunhand/dispatch`, 3 MCP tools, operator tools `brunhand_daemon.py` + `verify_brunhand.py`, 144 new tests in `tests/brunhand/` — total suite 430 passed (+144 from baseline 286, target was ≥310), ruff errors at or below baseline, Python 3.10 compat confirmed.*
