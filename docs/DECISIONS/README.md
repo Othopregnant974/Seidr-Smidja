@@ -75,6 +75,7 @@ Proposed  →  Accepted  →  Superseded (by D-NNN)
 | [D-005](D-005-annall-port-injection-pattern.md) | AnnallPort Injection Pattern | Accepted | 2026-05-06 | Port constructed at startup, passed as parameter; no global state; `None` disables logging in unit tests |
 | [D-006](D-006-oracle-eye-render-failure-behavior.md) | Oracle Eye Render-Failure Behavior | Accepted | 2026-05-06 | Render failure is soft: `.vrm` + structured warning returned; build not withheld |
 | [D-007](D-007-blender-subprocess-pattern-v0_1.md) | Blender Subprocess Pattern v0.1 | Accepted | 2026-05-06 | Two separate subprocess invocations (Forge + Oracle Eye); single-session optimization deferred |
+| [D-008](D-008-cli-command-name-inspect.md) | CLI Command Name: `seidr inspect` | Accepted | 2026-05-06 | `seidr inspect` is canonical (not `seidr check`); ratifies AUDIT-003 partial closure; `list-assets` deferred to v0.1.1 |
 
 ---
 

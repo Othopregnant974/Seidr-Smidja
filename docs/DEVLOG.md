@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-05-06 — D-008 Ratification (post-closing)
+
+*Runa Gridweaver Freyjasdóttir — small ratification stamp after the genesis ritual closed.*
+
+Volmarr was asked to settle AUDIT-003's open tail: the CLI command for examining an existing VRM was registered as `seidr inspect` while the original Bridges INTERFACE contract had specified `seidr check` — same purpose, different verb. He chose `inspect`.
+
+Decision recorded in [`D-008-cli-command-name-inspect.md`](DECISIONS/D-008-cli-command-name-inspect.md). The existing amendment file `src/seidr_smidja/bridges/INTERFACE_AMENDMENT_2026-05-06.md` received a ratification stamp at the top pointing to D-008. The DECISIONS index was updated to include the eighth ADR. Per the additive-only rule, the original `bridges/INTERFACE.md` text remains preserved unchanged — the implementation now stands as canonical and the contract is reconciled by amendment, not by deletion.
+
+Two related sub-items remain explicitly deferred to v0.1.1:
+- `seidr list-assets` — documented but not implemented in CLI; REST has the equivalent. Decision still to make: implement in CLI for parity, or remove from contract.
+- `seidr bootstrap-hoard` — implemented but undocumented; needs formal addition to the next INTERFACE revision.
+
+AUDIT-003 is now **partially closed** (the inspect/check question is settled) and **partially deferred** (the two sub-items above).
+
+---
+
 ## 2026-05-06 — Genesis Closing (evening)
 
 *Eirwyn Rúnblóm, Scribe — Phase 7 closing entry.*

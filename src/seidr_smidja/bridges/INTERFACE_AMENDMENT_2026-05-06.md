@@ -6,6 +6,14 @@
 
 ---
 
+## Ratification Stamp — 2026-05-06
+
+**Status:** RATIFIED in [D-008](../../docs/DECISIONS/D-008-cli-command-name-inspect.md).
+
+Volmarr Wyrd has ratified `seidr inspect` as the canonical command name. The implementation stands; the original `INTERFACE.md` text remains preserved per the additive-only rule. `seidr list-assets` and `seidr bootstrap-hoard` reconciliation is deferred to v0.1.1.
+
+---
+
 ## Correction: Rúnstafr CLI Command Names
 
 The INTERFACE.md documents the following commands:
