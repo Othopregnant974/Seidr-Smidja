@@ -77,6 +77,7 @@ Proposed  →  Accepted  →  Superseded (by D-NNN)
 | [D-007](D-007-blender-subprocess-pattern-v0_1.md) | Blender Subprocess Pattern v0.1 | Accepted | 2026-05-06 | Two separate subprocess invocations (Forge + Oracle Eye); single-session optimization deferred |
 | [D-008](D-008-cli-command-name-inspect.md) | CLI Command Name: `seidr inspect` | Accepted | 2026-05-06 | `seidr inspect` is canonical (not `seidr check`); ratifies AUDIT-003 partial closure; `list-assets` deferred to v0.1.1 |
 | [D-009](D-009-list-assets-and-bootstrap-hoard-cli.md) | `seidr list-assets` Implemented + `seidr bootstrap-hoard` Documented | Accepted | 2026-05-06 | Both deferred D-008 sub-items closed; v0.1.1-pending INTERFACE amendment ratified; AUDIT-003 fully closed |
+| [D-010](D-010-brunhand-feature-genesis.md) | Brúarhönd Feature Genesis (Cross-Machine VRoid Studio Remote Control) | Accepted | 2026-05-06 | Scope (c) ratified — primitives in v0.1, translation deferred to v0.2; lateral dispatch surface; Tailscale ACL + bearer token defense in depth; Skald-named sub-modules (Horfunarþjónn / Hengilherðir / Gæslumaðr / Sjálfsmöguleiki / Ljósbrú / Tengslastig); httpx promoted to base deps |
 
 ---
 
