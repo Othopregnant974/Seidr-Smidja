@@ -41,6 +41,10 @@ Third, the forge speaks through four doors — MCP (Mjöll), CLI (Rúnstafr), RE
 
 ---
 
+![https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/QRAO5.jpg](https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/QRAO5.jpg)
+
+---
+
 ## Quickstart for an AI Agent
 
 ### Through Rúnstafr (CLI)
