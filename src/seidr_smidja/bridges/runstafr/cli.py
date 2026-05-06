@@ -118,9 +118,25 @@ def cmd_build(
     render_views = [v.strip() for v in views.split(",")] if views else None
     compliance_targets = [t.strip() for t in targets.split(",")] if targets else None
 
+    # H-009: Load spec ONCE here to extract base_asset_id for BuildRequest population
+    # and for the display block below. Pass the pre-parsed spec dict to dispatch()
+    # instead of re-reading the file — eliminates double I/O and the race window where
+    # the file could change between the two reads.
+    try:
+        from seidr_smidja.loom.loader import load_spec
+
+        spec = load_spec(spec_path)
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: Spec validation failed: {exc}", err=True)
+        sys.exit(1)
+
     request = BuildRequest(
-        spec_source=spec_path,
-        base_asset_id="",  # Will be populated from spec
+        # Pass the in-memory dict — dispatch will not re-read the file.
+        spec_source=spec.to_dict(),
+        base_asset_id=spec.base_asset_id,
         output_dir=output_dir,
         render_views=render_views,
         compliance_targets=compliance_targets,
@@ -131,19 +147,6 @@ def cmd_build(
         },
         request_id=str(uuid.uuid4()),
     )
-
-    # Load spec first to get base_asset_id (CLI knows the spec path)
-    try:
-        from seidr_smidja.loom.loader import load_spec
-
-        spec = load_spec(spec_path)
-        request.base_asset_id = spec.base_asset_id
-    except Exception as exc:
-        if output_json:
-            click.echo(json.dumps({"success": False, "error": str(exc)}))
-        else:
-            click.echo(f"ERROR: Spec validation failed: {exc}", err=True)
-        sys.exit(1)
 
     if not output_json:
         click.echo(f"Building avatar: {spec.display_name} ({spec.avatar_id})")
@@ -305,6 +308,76 @@ def cmd_bootstrap_hoard(force: bool, config_path: str | None) -> None:
 
     results = run_bootstrap(catalog_path=catalog_path, bases_dir=bases_dir, force=force)
     sys.exit(0 if all(results.values()) else 1)
+
+
+@cli.command("list-assets")
+@click.option("--type", "asset_type", default=None, help="Filter by asset type (e.g. 'vrm_base').")
+@click.option("--tag", "tag", default=None, help="Filter by tag (e.g. 'feminine').")
+@click.option("--json", "output_json", is_flag=True, default=False, help="Output results as JSON.")
+@click.option("--config", "config_path", default=None)
+def cmd_list_assets(
+    asset_type: str | None,
+    tag: str | None,
+    output_json: bool,
+    config_path: str | None,
+) -> None:
+    """List available assets in the Hoard.
+
+    \b
+    Examples:
+        seidr list-assets
+        seidr list-assets --type vrm_base --tag feminine
+        seidr list-assets --json
+    """
+    project_root = _find_project_root()
+    config = _load_config(config_path, project_root)
+
+    from seidr_smidja.hoard.local import LocalHoardAdapter
+    from seidr_smidja.hoard.port import AssetFilter
+
+    hoard = LocalHoardAdapter.from_config(config, project_root)
+    filt = AssetFilter(
+        asset_type=asset_type,
+        tags=[tag] if tag else [],
+    )
+
+    try:
+        assets = hoard.list_assets(filt)
+    except Exception as exc:
+        if output_json:
+            click.echo(json.dumps({"success": False, "error": str(exc)}))
+        else:
+            click.echo(f"ERROR: Could not list assets: {exc}", err=True)
+        sys.exit(1)
+
+    if output_json:
+        result_list = [
+            {
+                "asset_id": a.asset_id,
+                "display_name": a.display_name,
+                "asset_type": a.asset_type,
+                "tags": a.tags,
+                "vrm_version": a.vrm_version,
+                "file_size_bytes": a.file_size_bytes,
+                "cached": a.cached,
+            }
+            for a in assets
+        ]
+        click.echo(json.dumps(result_list, indent=2))
+    else:
+        if not assets:
+            click.echo("No assets found matching the given filters.")
+        else:
+            click.echo(f"Hoard assets ({len(assets)} found):")
+            for a in assets:
+                cached_flag = "[cached]" if a.cached else "[not cached]"
+                tags_str = ", ".join(a.tags) if a.tags else "no tags"
+                click.echo(
+                    f"  {a.asset_id}  ({a.display_name})  "
+                    f"VRM {a.vrm_version}  {cached_flag}  tags: {tags_str}"
+                )
+
+    sys.exit(0)
 
 
 @cli.command("version")

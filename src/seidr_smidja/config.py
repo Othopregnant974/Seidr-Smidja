@@ -85,7 +85,11 @@ def _apply_env_vars(config: dict[str, Any]) -> dict[str, Any]:
         "SEIDR_OUTPUT_ROOT": ("output", "root"),
         "SEIDR_GATE_VRCHAT_TIER": ("gate", "vrchat_tier_target"),
     }
-    result = dict(config)
+    import copy as _copy
+    # Deep copy so we never mutate the caller's config dict.
+    # A shallow dict() copy would share nested sub-dicts with the original —
+    # mutating them would silently corrupt the input.
+    result = _copy.deepcopy(config)
     for env_key, path_tuple in env_map.items():
         val = os.environ.get(env_key)
         if val is None:

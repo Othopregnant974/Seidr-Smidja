@@ -4,6 +4,50 @@
 
 ---
 
+## 2026-05-06 — Hardening Phase B — All 23 Audit Findings Closed
+
+*Eldra Járnsdóttir (Forge Worker) — Phase B additive hardening pass.*
+
+Closed all 23 findings from `HARDENING_AUDIT_2026-05-06.md`. Test suite: 159 → 286 passing (+127 tests, +2 skipped for mcp-absent). Aggregate coverage: 75% → 82%. Ruff errors: 109 → 55 (pre-existing reduced). Mypy errors: 53 → 50 (pre-existing reduced). All new errors introduced by Phase B: zero.
+
+**MUST-FIX closed (High/Critical):**
+- H-001: forge/runner.py — single outer try/finally for temp dir cleanup
+- H-002: blender_runner.py — bounded `communicate(timeout=30)` after post-kill
+- H-003: hoard/local.py — path traversal containment check, `HoardSecurityError` typed exception
+- H-004: straumur/api.py — `POST /v1/inspect` path validation (extension + allow-list)
+- H-005: straumur/api.py — `__main__` defaults to 127.0.0.1, refuses non-localhost without config flag
+- H-006: blender_runner.py — `assert` replaced with explicit RuntimeError guard on null handles
+- H-007: dispatch.py — `validate_and_raise()` wired into dispatch Step 1 (Sacred Law IV)
+- H-008: annall/factory.py — `_CompositeAnnallAdapter` dual-write (SQLite + JSONL trace)
+- H-009: runstafr/cli.py — `load_spec()` called once; spec dict passed to dispatch (not path)
+- H-010: annall/adapters/sqlite.py — bare `raise` preserves exception context in `_connect()`
+- H-011: annall/adapters/sqlite.py + file.py — `print(sys.stderr)` replaced with `logger.warning()`
+- H-012: hoard/bootstrap.py — SHA-256 verification: mismatch deletes file, absent hash logs WARNING
+- H-013: hoard/local.py — `_validate_catalog_entries()` warns on bad/duplicate entries
+- H-014: straumur/api.py — `_get_annall()` caches instance (no per-request reconstruction)
+- H-015: blender_runner.py — stdout/stderr ordering documented via H-002 fix comment
+
+**NICE-TO-HAVE closed:**
+- H-016: gate/gate.py — lazy `_get_default_rules_dir()` replaces module-level path traversal
+- H-017: tests — non-Blender unit tests for forge/runner and oracle_eye/eye (7+6 new tests)
+- H-018: tests — Mjöll MCP bridge tests (4 new, 4 skipped when mcp absent)
+- H-019: tests — Annáll factory hardening tests (composite adapter, null/sqlite/file paths)
+- H-020: tests — bootstrap core + SHA-256 tests
+- H-021: tests — config.py deep merge + env var mapping tests (caught dict() shallow copy bug)
+
+**Notable fix discovered during testing:**
+- config.py `_apply_env_vars()`: `dict(config)` → `copy.deepcopy(config)` — prevents silent mutation of caller's nested dicts
+
+**New features:**
+- H-022: `seidr list-assets` CLI command implemented in runstafr/cli.py
+- H-023: `seidr bootstrap-hoard` documented in INTERFACE_AMENDMENT_v0_1_1_pending.md
+
+**Files touched:** forge/runner.py, _internal/blender_runner.py, hoard/exceptions.py, hoard/local.py, hoard/bootstrap.py, bridges/straumur/api.py, bridges/core/dispatch.py, annall/factory.py, bridges/runstafr/cli.py, annall/adapters/sqlite.py, annall/adapters/file.py, gate/gate.py, config.py — plus 11 new test files + 1 new interface amendment doc.
+
+**Status:** Phase B complete. Awaiting Phase C Auditor verification before git commit.
+
+---
+
 ## 2026-05-06 — D-008 Ratification (post-closing)
 
 *Runa Gridweaver Freyjasdóttir — small ratification stamp after the genesis ritual closed.*

@@ -121,6 +121,18 @@ def dispatch(
 
             spec = load_spec(request.spec_source, annall=annall, session_id=session_id)
             # NOTE: loom.validated event is now emitted by load_spec() itself (AUDIT-005).
+
+            # H-007: Run the semantic validator (was orphaned — now wired into dispatch).
+            # loom.validator.validate_and_raise() performs a second-pass semantic check
+            # beyond pydantic: blendshape name advisory checks, blank base_asset_id,
+            # license string sanity. This is distinct from pydantic structural validation.
+            from seidr_smidja.loom.validator import validate_and_raise
+
+            validate_and_raise(spec)
+            annall.log_event(
+                session_id,
+                AnnallEvent.info("loom.semantic_validated", {"avatar_id": spec.avatar_id}),
+            )
         except Exception as exc:
             err = BuildError.from_exception("loom", exc)
             errors.append(err)

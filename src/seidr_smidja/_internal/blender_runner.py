@@ -231,8 +231,14 @@ def run_blender(
 
         # Stream stdout line by line for the on_line callback; capture all output.
         try:
-            assert process.stdout is not None
-            assert process.stderr is not None
+            # H-006: Replace assert statements with explicit RuntimeError guards.
+            # assert is silently stripped under python -O, giving a cryptic TypeError
+            # when the loop tries to iterate over None.
+            if process.stdout is None or process.stderr is None:
+                raise RuntimeError(
+                    "Blender subprocess stdout/stderr are None despite PIPE flag. "
+                    "This is a platform or Python version bug — cannot stream output."
+                )
 
             # Collect stdout with optional line streaming
             for line in process.stdout:
@@ -244,14 +250,32 @@ def run_blender(
                     except Exception:
                         pass  # Never let a callback kill the subprocess reader
 
-            # Wait for process and collect remaining stderr
+            # Wait for process and collect remaining stderr.
+            # H-015 note: stdout EOF is reached first (process closes stdout before
+            # exiting). communicate() then drains any remaining stderr buffer.
+            # H-002: Add a hard timeout to the post-kill communicate() path so a
+            # wedged Windows process (e.g. AV hold, open handles) cannot hang the
+            # forge indefinitely. The post-kill window is 30 s — generous for normal
+            # TerminateProcess() but bounded for pathological cases.
+            _POST_KILL_TIMEOUT = 30
             try:
                 _, stderr_raw = process.communicate(timeout=timeout)
-                stderr_lines.extend(stderr_raw.splitlines())
+                stderr_lines.extend(stderr_raw.splitlines() if stderr_raw else [])
             except subprocess.TimeoutExpired:
                 process.kill()
-                _, stderr_raw = process.communicate()
-                stderr_lines.extend(stderr_raw.splitlines())
+                try:
+                    _, stderr_raw = process.communicate(timeout=_POST_KILL_TIMEOUT)
+                    stderr_lines.extend(stderr_raw.splitlines() if stderr_raw else [])
+                except subprocess.TimeoutExpired:
+                    # H-002: Process did not die within post-kill window.
+                    # Log clearly and continue — we cannot block forever.
+                    logger.error(
+                        "Blender process did not terminate after kill "
+                        "(post-kill timeout=%ds, script=%s). "
+                        "Continuing without further stderr collection.",
+                        _POST_KILL_TIMEOUT,
+                        script_path,
+                    )
                 timed_out = True
                 logger.warning(
                     "Blender subprocess timed out after %d seconds (script: %s)",

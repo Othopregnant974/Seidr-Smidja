@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from seidr_smidja.hoard.exceptions import AssetNotFoundError, HoardError
+from seidr_smidja.hoard.exceptions import AssetNotFoundError, HoardError, HoardSecurityError
 from seidr_smidja.hoard.port import AssetFilter, AssetMeta
 
 if TYPE_CHECKING:
@@ -29,6 +29,76 @@ if TYPE_CHECKING:
     from seidr_smidja.annall.port import AnnallPort
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_catalog_entries(
+    entries: list[Any],
+    catalog_path: Path,
+) -> list[Any]:
+    """H-013: Validate catalog entries, warning on malformed or duplicate data.
+
+    Validation is advisory — invalid entries are excluded from the result but
+    do not crash the catalog load. This surfaces data quality issues without
+    breaking the pipeline (graceful degradation per PHILOSOPHY §Sacred Law VIII).
+
+    Args:
+        entries:       The raw list from catalog_data["bases"].
+        catalog_path:  Used in warning messages for diagnostics.
+
+    Returns:
+        A filtered list containing only entries that pass basic structural checks.
+    """
+    if not isinstance(entries, list):
+        logger.warning(
+            "Hoard catalog at %s: 'bases' field is not a list (got %s) — treating as empty.",
+            catalog_path,
+            type(entries).__name__,
+        )
+        return []
+
+    seen_ids: set[str] = set()
+    valid: list[Any] = []
+
+    for i, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            logger.warning(
+                "Hoard catalog at %s: entry[%d] is not a mapping — skipped.",
+                catalog_path,
+                i,
+            )
+            continue
+
+        asset_id = entry.get("asset_id")
+        filename = entry.get("filename")
+
+        if not asset_id:
+            logger.warning(
+                "Hoard catalog at %s: entry[%d] is missing 'asset_id' field — skipped.",
+                catalog_path,
+                i,
+            )
+            continue
+
+        if not filename:
+            logger.warning(
+                "Hoard catalog at %s: entry '%s' is missing 'filename' field — skipped.",
+                catalog_path,
+                asset_id,
+            )
+            continue
+
+        if asset_id in seen_ids:
+            logger.warning(
+                "Hoard catalog at %s: duplicate asset_id '%s' — second occurrence skipped.",
+                catalog_path,
+                asset_id,
+            )
+            continue
+
+        seen_ids.add(asset_id)
+        valid.append(entry)
+
+    return valid
 
 
 class LocalHoardAdapter:
@@ -57,7 +127,9 @@ class LocalHoardAdapter:
                 data = yaml.safe_load(fh)
             if not isinstance(data, dict):
                 raise HoardError(f"Catalog file {self._catalog_path} is not a YAML mapping.")
-            self._catalog = data.get("bases", [])
+            raw_entries = data.get("bases", [])
+            # H-013: Validate catalog entries and warn on malformed or duplicate data.
+            self._catalog = _validate_catalog_entries(raw_entries, self._catalog_path)
             self._loaded = True
             logger.debug(
                 "Hoard catalog loaded: %d assets from %s",
@@ -121,6 +193,28 @@ class LocalHoardAdapter:
             )
 
         asset_path = (self._bases_dir / filename).resolve()
+
+        # H-003: Verify the resolved path is actually inside bases_dir.
+        # A crafted catalog entry such as "../../etc/passwd" would pass through
+        # resolve() with the traversal silently normalized unless we call
+        # relative_to() on the resolved result.
+        bases_resolved = self._bases_dir.resolve()
+        try:
+            asset_path.relative_to(bases_resolved)
+        except ValueError:
+            msg = (
+                f"Catalog entry for '{asset_id}' has a filename that resolves "
+                f"outside the Hoard bases_dir. Resolved path: {asset_path}. "
+                f"Expected a child of: {bases_resolved}. "
+                "This may indicate a tampered catalog."
+            )
+            logger.error(
+                "Hoard security: path traversal rejected for asset '%s': %s → %s",
+                asset_id,
+                filename,
+                asset_path,
+            )
+            raise HoardSecurityError(asset_id=asset_id, message=msg)
 
         if not asset_path.exists():
             cached = entry.get("cached", False)

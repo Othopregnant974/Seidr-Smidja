@@ -27,8 +27,31 @@ from seidr_smidja.gate.vrm_reader import VRMReadError, extract_vrm_compliance_da
 
 logger = logging.getLogger(__name__)
 
-# Default rules directory — resolved relative to project at startup, not hardcoded.
-_DEFAULT_RULES_DIR = Path(__file__).parent.parent.parent.parent / "data" / "gate"
+# H-016: Defer default rules dir resolution to first call rather than module import.
+# The import-time __file__ traversal (4 x .parent) breaks in PyInstaller / zip-import
+# scenarios where the package layout is flattened. Lazy resolution + existence check
+# means failures are caught at call time (loud) not at import time (silent).
+_DEFAULT_RULES_DIR: Path | None = None
+
+
+def _get_default_rules_dir() -> Path:
+    """Return (and cache) the default rules directory, with an existence check.
+
+    On first call, resolves relative to __file__. On subsequent calls returns
+    the cached value. Logs a WARNING if the directory does not exist.
+    """
+    global _DEFAULT_RULES_DIR
+    if _DEFAULT_RULES_DIR is None:
+        candidate = Path(__file__).parent.parent.parent.parent / "data" / "gate"
+        if not candidate.exists():
+            logger.warning(
+                "Gate: default rules directory not found at %s. "
+                "Set config key gate.rules_dir or SEIDR_GATE_RULES_DIR env var "
+                "to an explicit path if you are running from an installed package.",
+                candidate,
+            )
+        _DEFAULT_RULES_DIR = candidate
+    return _DEFAULT_RULES_DIR
 
 
 def _load_rules(rules_file: Path) -> tuple[list[ComplianceRule], dict[str, Any]]:
@@ -364,7 +387,7 @@ def check(
         except ValueError as exc:
             raise GateError(f"Unknown compliance target: {exc}") from exc
 
-    _rules_dir = rules_dir or _DEFAULT_RULES_DIR
+    _rules_dir = rules_dir or _get_default_rules_dir()
 
     # Parse VRM header
     try:
@@ -445,7 +468,7 @@ def list_rules(target: ComplianceTarget, rules_dir: Path | None = None) -> list[
     Raises:
         GateError: If the rule file cannot be read.
     """
-    _rules_dir = rules_dir or _DEFAULT_RULES_DIR
+    _rules_dir = rules_dir or _get_default_rules_dir()
     if target == ComplianceTarget.VRCHAT:
         rules_file = _rules_dir / "vrchat_rules.yaml"
     elif target == ComplianceTarget.VTUBE_STUDIO:

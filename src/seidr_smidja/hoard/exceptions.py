@@ -41,3 +41,19 @@ class AssetFetchError(RuntimeError):
 
 class HoardError(RuntimeError):
     """Raised on catalog read failure or other internal Hoard errors."""
+
+
+class HoardSecurityError(HoardError):
+    """Raised when a Hoard operation is rejected for security reasons.
+
+    H-003: Raised when a catalog entry's filename field resolves to a path
+    outside the configured bases_dir (path traversal attempt).
+
+    Attributes:
+        asset_id: The catalog key whose filename was rejected.
+        message:  Human-readable diagnostic including the attempted path.
+    """
+
+    def __init__(self, asset_id: str, message: str) -> None:
+        self.asset_id = asset_id
+        super().__init__(message)

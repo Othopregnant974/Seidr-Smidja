@@ -126,60 +126,63 @@ def build(
             },
         )
 
-    # Write spec to temp file
+    # H-001 fix: Single outer try/finally wraps the full block from mkdtemp through
+    # subprocess completion, so temp dir is always cleaned up — even if the spec
+    # write itself raises OSError before we ever enter the run_blender() try-block.
+    import shutil
+    import tempfile as _tempfile
+
     tmp_dir = None
-    spec_path: Path | None = None
     try:
-        import tempfile as _tempfile
-
         tmp_dir = Path(_tempfile.mkdtemp())
-        spec_path = tmp_dir / "spec.json"
-        spec_path.write_text(spec_json, encoding="utf-8")
-    except OSError as exc:
-        raise ForgeBuildError(
-            f"Failed to write temporary spec file: {exc}", cause=exc
-        ) from exc
+        spec_path: Path = tmp_dir / "spec.json"
+        try:
+            spec_path.write_text(spec_json, encoding="utf-8")
+        except OSError as exc:
+            raise ForgeBuildError(
+                f"Failed to write temporary spec file: {exc}", cause=exc
+            ) from exc
 
-    output_vrm = output_dir / f"{spec.avatar_id}.vrm"
+        output_vrm = output_dir / f"{spec.avatar_id}.vrm"
 
-    # Build Blender args (these are passed after '--' to the script)
-    blender_args = [
-        "--spec",
-        str(spec_path),
-        "--base",
-        str(base_asset),
-        "--output",
-        str(output_vrm),
-    ]
+        # Build Blender args (these are passed after '--' to the script)
+        blender_args = [
+            "--spec",
+            str(spec_path),
+            "--base",
+            str(base_asset),
+            "--output",
+            str(output_vrm),
+        ]
 
-    # Collect output lines for Annáll streaming
-    stdout_lines: list[str] = []
+        # Collect output lines for Annáll streaming
+        stdout_lines: list[str] = []
 
-    def on_line(line: str) -> None:
-        stdout_lines.append(line)
+        def on_line(line: str) -> None:
+            stdout_lines.append(line)
 
-    try:
-        runner_result: RunnerResult = run_blender(
-            script_path=_BUILD_SCRIPT,
-            args=blender_args,
-            config=config,
-            on_line=on_line,
-        )
-    except BlenderNotFoundError as exc:
-        raise ForgeBuildError(
-            f"Blender not found — cannot run Forge build: {exc}",
-            cause=exc,
-        ) from exc
-    except OSError as exc:
-        raise ForgeBuildError(
-            f"Failed to launch Blender subprocess: {exc}", cause=exc
-        ) from exc
+        try:
+            runner_result: RunnerResult = run_blender(
+                script_path=_BUILD_SCRIPT,
+                args=blender_args,
+                config=config,
+                on_line=on_line,
+            )
+        except BlenderNotFoundError as exc:
+            raise ForgeBuildError(
+                f"Blender not found — cannot run Forge build: {exc}",
+                cause=exc,
+            ) from exc
+        except OSError as exc:
+            raise ForgeBuildError(
+                f"Failed to launch Blender subprocess: {exc}", cause=exc
+            ) from exc
+
     finally:
-        # Clean up temp dir
-        if tmp_dir and tmp_dir.exists():
+        # H-001: Always clean up temp dir — covers spec write failure AND subprocess
+        # failure paths. This finally runs even if ForgeBuildError is raised above.
+        if tmp_dir is not None and tmp_dir.exists():
             try:
-                import shutil
-
                 shutil.rmtree(tmp_dir, ignore_errors=True)
             except Exception:
                 pass

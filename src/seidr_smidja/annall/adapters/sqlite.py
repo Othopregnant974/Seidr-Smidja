@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-import sys
 import uuid
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -82,11 +81,12 @@ class SQLiteAnnallAdapter:
                 conn.executescript(_SCHEMA_SQL)
                 conn.commit()
         except sqlite3.Error as exc:
-            # Log to stderr — we must never raise from Annáll infrastructure setup
-            print(
-                f"[annall.sqlite] WARNING: could not initialize database "
-                f"at {self._db_path}: {exc}",
-                file=sys.stderr,
+            # H-011: Use logger.warning instead of print() — respects Python logging
+            # configuration including structured log handlers.
+            logger.warning(
+                "annall.sqlite: could not initialize database at %s: %s",
+                self._db_path,
+                exc,
             )
 
     @contextmanager
@@ -97,9 +97,9 @@ class SQLiteAnnallAdapter:
         try:
             yield conn
             conn.commit()
-        except sqlite3.Error as exc:
+        except sqlite3.Error:
             conn.rollback()
-            raise exc
+            raise  # H-010: bare re-raise preserves original traceback origin
         finally:
             conn.close()
 
@@ -126,7 +126,8 @@ class SQLiteAnnallAdapter:
                     ),
                 )
         except sqlite3.Error as exc:
-            print(f"[annall.sqlite] WARNING: open_session failed: {exc}", file=sys.stderr)
+            # H-011: logger not print
+            logger.warning("annall.sqlite: open_session failed: %s", exc)
         return session_id
 
     def log_event(self, session_id: SessionID, event: AnnallEvent) -> None:
@@ -147,7 +148,8 @@ class SQLiteAnnallAdapter:
                     ),
                 )
         except sqlite3.Error as exc:
-            print(f"[annall.sqlite] WARNING: log_event failed: {exc}", file=sys.stderr)
+            # H-011: logger not print
+            logger.warning("annall.sqlite: log_event failed: %s", exc)
 
     def close_session(self, session_id: SessionID, outcome: SessionOutcome) -> None:
         """Close a session. Never raises."""
@@ -167,7 +169,8 @@ class SQLiteAnnallAdapter:
                     ),
                 )
         except sqlite3.Error as exc:
-            print(f"[annall.sqlite] WARNING: close_session failed: {exc}", file=sys.stderr)
+            # H-011: logger not print
+            logger.warning("annall.sqlite: close_session failed: %s", exc)
 
     def query_sessions(self, filter: SessionFilter) -> list[SessionSummary]:
         """Query sessions. May raise AnnallQueryError."""

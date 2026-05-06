@@ -147,6 +147,38 @@ def run_bootstrap(
         if success:
             sha256 = _compute_sha256(dest)
             size = dest.stat().st_size
+
+            # H-012: Compare computed SHA-256 against pinned expected value (if set).
+            # If the catalog entry carries an expected_sha256, the downloaded file
+            # must match. On mismatch, delete the file and refuse to cache it.
+            expected_sha256 = asset_info.get("expected_sha256")
+            if expected_sha256 and sha256 != expected_sha256:
+                dest.unlink(missing_ok=True)
+                logger.error(
+                    "Hoard bootstrap: SHA-256 mismatch for '%s': "
+                    "expected %s, got %s — file deleted.",
+                    asset_id,
+                    expected_sha256,
+                    sha256,
+                )
+                if verbose:
+                    print(
+                        f"  ERROR: SHA-256 mismatch for '{asset_id}'! "
+                        f"Expected: {expected_sha256}, Got: {sha256}. "
+                        "File deleted — possible tampering or CDN corruption."
+                    )
+                results[asset_id] = False
+                continue
+            elif not expected_sha256:
+                # No pinned hash yet — record the computed hash for future pinning.
+                # Log a WARNING so operators know to pin it for production hardening.
+                logger.warning(
+                    "Hoard bootstrap: no expected_sha256 for '%s' — hash not verified. "
+                    "Computed sha256=%s. Consider pinning this value in _BOOTSTRAP_ASSETS.",
+                    asset_id,
+                    sha256,
+                )
+
             if verbose:
                 print(f"  OK: {dest.name} ({size} bytes, sha256: {sha256[:16]}...)")
             _update_catalog_entry(catalog_path, asset_id, dest, asset_info, sha256=sha256, size=size)

@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,7 +58,8 @@ class FileAnnallAdapter:
             with self._path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(record, default=str) + "\n")
         except OSError as exc:
-            print(f"[annall.file] WARNING: failed to write to {self._path}: {exc}", file=sys.stderr)
+            # H-011: logger not print — respects Python logging configuration
+            logger.warning("annall.file: failed to write to %s: %s", self._path, exc)
 
     def open_session(self, metadata: dict[str, Any]) -> SessionID:
         session_id = str(uuid.uuid4())

@@ -17,6 +17,7 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from pathlib import Path
 from typing import Any
@@ -71,6 +72,66 @@ class InspectRequestBody(_BaseModel):  # type: ignore[misc]
 # ─── App factory ─────────────────────────────────────────────────────────────
 
 
+def _validate_vrm_path_for_inspect(vrm_path: Path, cfg: dict[str, Any], project_root: Path) -> None:
+    """H-004: Validate that a VRM path submitted to POST /v1/inspect is safe to open.
+
+    Checks:
+        1. The path must end in .vrm (case-insensitive) — prevent reading arbitrary files.
+        2. The resolved path must be inside an allow-listed directory tree.
+           Default allow-list: <project_root>/output/ and <project_root>/data/hoard/bases/
+           Operators may add additional roots via config key straumur.inspect_roots (list).
+
+    Raises:
+        HTTPException(400): If the path fails any check.
+    """
+    _require_fastapi()
+
+    if vrm_path.suffix.lower() != ".vrm":
+        raise HTTPException(  # type: ignore[misc]
+            status_code=400,
+            detail={
+                "error": "invalid_vrm_path",
+                "message": "vrm_path must refer to a .vrm file (by extension).",
+            },
+        )
+
+    resolved = vrm_path.resolve()
+
+    # Build the allow-list from config + safe defaults
+    output_root_str = cfg.get("output", {}).get("root", "output")
+    hoard_bases_str = cfg.get("hoard", {}).get("bases_dir", "data/hoard/bases")
+    default_roots = [
+        (project_root / output_root_str).resolve(),
+        (project_root / hoard_bases_str).resolve(),
+    ]
+    extra_roots_cfg = cfg.get("straumur", {}).get("inspect_roots", [])
+    extra_roots = [Path(r).resolve() for r in extra_roots_cfg if r]
+    allow_list = default_roots + extra_roots
+
+    for allowed_root in allow_list:
+        try:
+            resolved.relative_to(allowed_root)
+            return  # Path is inside this allowed root — accept
+        except ValueError:
+            continue
+
+    logger.warning(
+        "Straumur H-004: rejected vrm_path outside allow-list: %s (allowed: %s)",
+        resolved,
+        [str(r) for r in allow_list],
+    )
+    raise HTTPException(  # type: ignore[misc]
+        status_code=400,
+        detail={
+            "error": "vrm_path_not_allowed",
+            "message": (
+                "vrm_path must be inside the configured output or hoard directories. "
+                "Path traversal or arbitrary file access is not permitted."
+            ),
+        },
+    )
+
+
 def create_app(config: dict[str, Any] | None = None) -> Any:
     """Create the FastAPI application.
 
@@ -98,12 +159,20 @@ def create_app(config: dict[str, Any] | None = None) -> Any:
             _config = load_config()
         return _config
 
-    def _get_annall() -> Any:
-        from seidr_smidja.annall.factory import make_annall
-        from seidr_smidja.config import _find_config_root
+    # H-014: Cache the annall adapter — constructing a new SQLiteAnnallAdapter on
+    # every request calls PRAGMA journal_mode=WAL + CREATE TABLE IF NOT EXISTS each
+    # time. The adapter is expensive to construct; cache it alongside _config.
+    _annall_instance: Any = None
 
-        cfg = _get_config()
-        return make_annall(cfg, _find_config_root())
+    def _get_annall() -> Any:
+        nonlocal _annall_instance
+        if _annall_instance is None:
+            from seidr_smidja.annall.factory import make_annall
+            from seidr_smidja.config import _find_config_root
+
+            cfg = _get_config()
+            _annall_instance = make_annall(cfg, _find_config_root())
+        return _annall_instance
 
     @app.get("/v1/health")
     async def health() -> dict[str, str]:
@@ -180,6 +249,9 @@ def create_app(config: dict[str, Any] | None = None) -> Any:
         project_root = _find_config_root()
         vrm_path = Path(body.vrm_path)
 
+        # H-004: Reject vrm_paths that are not .vrm or that escape allowed roots.
+        _validate_vrm_path_for_inspect(vrm_path, cfg, project_root)
+
         gate_cfg = cfg.get("gate", {})
         rules_dir_str = gate_cfg.get("rules_dir")
         rules_dir = (project_root / rules_dir_str).resolve() if rules_dir_str else None
@@ -246,7 +318,7 @@ def create_app(config: dict[str, Any] | None = None) -> Any:
         )
 
     @app.get("/v1/avatars/{session_id}")
-    async def get_session(session_id: str) -> JSONResponse:  # type: ignore[misc]
+    async def get_session(session_id: str) -> JSONResponse:
         annall = _get_annall()
         try:
             record = annall.get_session(session_id)
@@ -275,7 +347,7 @@ def create_app(config: dict[str, Any] | None = None) -> Any:
                 }
             )
         except Exception as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc  # type: ignore[misc]
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return app
 
@@ -291,9 +363,40 @@ def _build_app() -> Any:
 if _FASTAPI_AVAILABLE:
     app = _build_app()
 else:
-    app = None  # type: ignore[assignment]
+    app = None  # type: ignore[assignment,misc]
 
 if __name__ == "__main__":
     import uvicorn  # type: ignore[import]
+    from seidr_smidja.config import load_config  # noqa: E402  (local import in __main__)
 
-    uvicorn.run("seidr_smidja.bridges.straumur.api:app", host="0.0.0.0", port=8765, reload=False)
+    # H-005: Default to localhost-only binding.
+    # The forge is documented as an agent-only system. Exposing it on all interfaces
+    # (0.0.0.0) without auth makes it reachable from any connected network.
+    # Operators who genuinely need remote access must set SEIDR_STRAUMUR_HOST
+    # AND set straumur.allow_remote_bind: true in config/user.yaml.
+    _host = os.environ.get("SEIDR_STRAUMUR_HOST", "127.0.0.1")
+    _port = int(os.environ.get("SEIDR_STRAUMUR_PORT", "8765"))
+
+    # Safety check: warn loudly when binding beyond localhost
+    _cfg = load_config() if _FASTAPI_AVAILABLE else {}
+    _allow_remote = _cfg.get("straumur", {}).get("allow_remote_bind", False)
+    if _host not in ("127.0.0.1", "::1", "localhost") and not _allow_remote:
+        logger.error(
+            "Straumur H-005: Refusing to bind to non-localhost host '%s' because "
+            "straumur.allow_remote_bind is not set to true in config. "
+            "Set SEIDR_STRAUMUR_HOST=127.0.0.1 or add 'straumur: {allow_remote_bind: true}' "
+            "to config/user.yaml if remote access is intentional.",
+            _host,
+        )
+        raise SystemExit(
+            f"Straumur: refusing non-localhost bind to '{_host}' without allow_remote_bind=true."
+        )
+    if _host not in ("127.0.0.1", "::1", "localhost"):
+        logger.warning(
+            "Straumur: bound to %s:%d — this forge is accessible from remote hosts. "
+            "There is no authentication. Ensure network access is restricted.",
+            _host,
+            _port,
+        )
+
+    uvicorn.run("seidr_smidja.bridges.straumur.api:app", host=_host, port=_port, reload=False)
