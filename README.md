@@ -1,3 +1,9 @@
+---
+
+![https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/2D66H.jpg](https://raw.githubusercontent.com/hrabanazviking/Seidr-Smidja/refs/heads/development/2D66H.jpg)
+
+---
+
 # Seiðr-Smiðja
 
 > *An agent-only VRM avatar smithy. No human hands. Only the fire, the spec, and the eye that sees.*
