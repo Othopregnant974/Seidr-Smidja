@@ -69,3 +69,45 @@ gate:
 output:
   root: "output"                 # Default output root when --out is not specified on CLI.
   create_if_missing: true        # Auto-create output directories.
+
+# --- Brúarhönd (Bridge-Hand) — cross-machine VRoid Studio remote control ---
+# D-010: Brúarhönd is a lateral dispatch surface; not part of the Blender pipeline.
+# Daemon-side settings apply only on the VRoid host; client-side settings apply on the forge.
+brunhand:
+  # List of registered VRoid hosts. Add entries in config/user.yaml — never here.
+  hosts: []
+  daemon:
+    # Default bind address for the daemon (Horfunarþjónn).
+    # Override to a Tailscale interface address in config/user.yaml.
+    # INVARIANT: The daemon refuses to bind to non-localhost unless allow_remote_bind: true.
+    bind_address: "127.0.0.1"
+    port: 8848
+    # Explicit operator opt-in for Tailscale / non-loopback binding.
+    # When false, any non-localhost bind_address causes a hard startup failure.
+    allow_remote_bind: false
+    tls:
+      enabled: false
+      cert_path: null
+      key_path: null
+    # Default project/export roots (relative paths on the daemon host — no absolute paths).
+    project_root: "projects"
+    export_root: "exports"
+    # Per-primitive defaults
+    primitive_defaults:
+      wait_for_window_timeout: 30.0
+      screenshot_compression: 6   # PNG compression level 0-9
+    # Rate limiting (disabled by default)
+    rate_limit: false
+    rate_limit_window_seconds: 60
+    rate_limit_max: 120
+    request_timeout_seconds: 60
+  client:
+    timeout_seconds: 30.0
+    connect_timeout_seconds: 5.0
+    # Buffer added on top of a primitive's own timeout_seconds for the httpx request timeout.
+    # Ensures the HTTP connection does not time out before the daemon-side primitive finishes.
+    request_timeout_buffer: 5.0
+    retry_max: 3
+    retry_backoff_base: 0.5
+    retry_on: [500, 502, 503]
+    verify_tls: true

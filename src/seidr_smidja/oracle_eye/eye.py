@@ -265,3 +265,141 @@ def _log_annall(
         annall.log_event(session_id, AnnallEvent.info(event_type, payload))
     except Exception:
         pass
+
+
+# ─── Brúarhönd External Render Integration (Additive — D-010) ───────────────
+# These classes and the register_external_render() function extend Oracle Eye
+# to accept externally-sourced PNG bytes (from Brúarhönd daemon screenshots).
+# INVARIANT: They do NOT modify render(), RenderResult, RenderView, or any
+# existing public surface. They are purely additive.
+# See: docs/features/brunhand/ARCHITECTURE.md §VII Vision Integration (Ljósbrú)
+
+
+@dataclass
+class ExternalRenderMetadata:
+    """Metadata for an externally-sourced render (e.g., a Brúarhönd screenshot).
+
+    Attributes:
+        host:            Tailscale host the screenshot came from.
+        session_id:      Tengslastig session ID.
+        agent_id:        Agent identity string.
+        captured_at:     ISO 8601 UTC timestamp from the daemon.
+        screen_geometry: Monitor geometry reported by the daemon (optional).
+        source:          Source identifier, e.g. "brunhand".
+    """
+
+    host: str = ""
+    session_id: str = ""
+    agent_id: str = ""
+    captured_at: str = ""
+    source: str = "brunhand"
+    screen_geometry: dict[str, Any] | None = None
+
+
+@dataclass
+class ExternalRenderResult:
+    """Result of register_external_render().
+
+    Attributes:
+        view_path:   Path to the written PNG file. None if output_dir is not configured.
+        view_name:   Canonical view name: "brunhand/live/<session_id>/<timestamp>".
+        png_bytes:   The original PNG bytes (echoed back for immediate use).
+        byte_count:  Size of the PNG data in bytes.
+    """
+
+    view_path: Path | None
+    view_name: str
+    png_bytes: bytes
+    byte_count: int
+
+
+def register_external_render(
+    source: str,
+    view: str,
+    png_bytes: bytes,
+    metadata: ExternalRenderMetadata | None = None,
+    output_dir: Path | None = None,
+    run_id: str | None = None,
+    annall: Any = None,
+    annall_session_id: Any = None,
+) -> ExternalRenderResult:
+    """Register an externally-sourced PNG as a named Oracle Eye render.
+
+    Called by Ljósbrú (brunhand/client/oracle_channel.py) when the Brúarhönd
+    client receives a screenshot response from the daemon. This ensures remote
+    VRoid Studio screenshots arrive through the same Oracle Eye channel as
+    headless Blender renders — agents see one unified vision stream.
+
+    INVARIANT: This function never modifies render(), RenderResult, or any
+    existing Oracle Eye behavior. It is purely additive.
+
+    Args:
+        source:           Source identifier, e.g. "brunhand".
+        view:             View name, e.g. "live/<session_id>/<timestamp>".
+        png_bytes:        Raw PNG bytes to register.
+        metadata:         Optional ExternalRenderMetadata for Annáll context.
+        output_dir:       Optional directory to write the PNG. If None, PNG is
+                          in-memory only (view_path == None in result).
+        run_id:           Optional run_id for Mode C cross-correlation.
+        annall:           Optional AnnallPort for telemetry.
+        annall_session_id: Session ID for the Annáll event.
+
+    Returns:
+        ExternalRenderResult with view_path, view_name, png_bytes, byte_count.
+
+    Note:
+        Screenshot bytes are NEVER logged to Annáll — only metadata
+        (byte count, view_name, host) is recorded. This is an invariant.
+    """
+    meta = metadata or ExternalRenderMetadata()
+    canonical_view_name = f"{source}/{view}"
+    view_path: Path | None = None
+    byte_count = len(png_bytes)
+
+    # Write to disk if output_dir provided
+    if output_dir is not None:
+        try:
+            # Build subdirectory: output_dir/external_renders/<source>/<safe_view>/
+            # Replace slashes in view name with OS-safe underscores for directory structure
+            safe_view = view.replace("/", "_").replace("\\", "_")
+            render_subdir = output_dir / "external_renders" / source
+            render_subdir.mkdir(parents=True, exist_ok=True)
+            view_path = render_subdir / f"{safe_view}.png"
+            view_path.write_bytes(png_bytes)
+        except Exception as exc:
+            logger.warning(
+                "Oracle Eye: could not write external render to disk: %s", exc
+            )
+            view_path = None
+
+    # Log to Annáll — metadata only, never raw bytes
+    _log_annall(
+        annall,
+        annall_session_id,
+        "oracle_eye.external_render.registered",
+        {
+            "source": source,
+            "view": view,
+            "canonical_view_name": canonical_view_name,
+            "byte_count": byte_count,
+            "host": meta.host,
+            "session_id": meta.session_id,
+            "agent_id": meta.agent_id,
+            "captured_at": meta.captured_at,
+            "view_path": str(view_path) if view_path else None,
+            "run_id": run_id,
+        },
+    )
+
+    logger.debug(
+        "Oracle Eye: external render registered — %s (%d bytes)",
+        canonical_view_name,
+        byte_count,
+    )
+
+    return ExternalRenderResult(
+        view_path=view_path,
+        view_name=canonical_view_name,
+        png_bytes=png_bytes,
+        byte_count=byte_count,
+    )

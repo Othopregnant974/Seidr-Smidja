@@ -14,10 +14,13 @@ Public surface: see INTERFACE.md in this directory.
 """
 
 from seidr_smidja.oracle_eye.eye import (
+    ExternalRenderMetadata,
+    ExternalRenderResult,
     RenderError,
     RenderResult,
     RenderView,
     list_standard_views,
+    register_external_render,
     render,
 )
 
@@ -27,4 +30,8 @@ __all__ = [
     "RenderView",
     "RenderResult",
     "RenderError",
+    # Brúarhönd external render integration (additive — D-010)
+    "register_external_render",
+    "ExternalRenderMetadata",
+    "ExternalRenderResult",
 ]

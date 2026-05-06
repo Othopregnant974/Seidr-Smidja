@@ -25,6 +25,9 @@ dependencies = [
     "uvicorn[standard]>=0.29",
     # MCP Bridge (Mjöll)
     "mcp>=1.0",
+    # Brúarhönd — Hengilherðir client (forge-side; no GUI deps required here)
+    # D-010: promoted from [dev] to base so the client is always available.
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -34,7 +37,7 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.4",
     "mypy>=1.10",
-    "httpx>=0.27",   # for Straumur test client and Brúarhönd client
+    "respx>=0.21",  # httpx mocking for Brúarhönd client tests
 ]
 # Brúarhönd — daemon-side GUI automation dependencies.
 # Install on the VRoid Studio host machine, not the forge.
