@@ -163,9 +163,11 @@ The translation layer above primitives (Loom YAML → automatic VRoid UI navigat
 | 2 — Bones | Architect | COMPLETE | 0697837 |
 | 3 — Rivers | Cartographer | COMPLETE | 6be9934 |
 | 4 — Memory mid-ritual | Scribe | COMPLETE | 0af8691 |
-| 5 — First Forging | Forge Worker | COMPLETE | (pending commit — 430 tests, 144 new) |
-| 6 — Verification | Auditor | PENDING | — |
-| 7 — Closing | Scribe | PENDING | — |
+| 5 — First Forging | Forge Worker | COMPLETE | `e2cb8e6` (+`ba6a353` amends, +`afe89f2` chore) |
+| 6 — Verification | Auditor → Forge Worker (remediation) | COMPLETE | `c4305b3` (audit) + `e3f126d` (remediation, all 18 findings closed) |
+| 7 — Closing | Runa (in discipline of Eirwyn) | COMPLETE | `2ef0bf5` (Scribe close) + `7003d8a` (README/REPO_OVERVIEW refresh) |
+
+**RITUAL CLOSED 2026-05-06.** All 18 audit findings closed (B-013 + B-014 documented in INTERFACE_AMENDMENT, B-011 closed via owns_client param). **489 non-Blender, non-VRoid-host pytest tests passing.** ADR D-010 ratified. Operational README and REPO_OVERVIEW refreshed with full setup instructions for both the headless forge path and the cross-machine VRoid Studio remote-control path.
 
 ---
 
