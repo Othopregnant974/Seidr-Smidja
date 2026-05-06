@@ -630,3 +630,184 @@ The `BuildRequest.request_id` UUID is already present. A task queue (e.g., async
 
 *Drawn at the third founding fire, 2026-05-06.*
 *Védis Eikleið, Cartographer — for Volmarr Wyrd.*
+
+---
+
+## XI. VRM Export Pipeline — Blender Add-on Internals
+
+*Trace of every function call from the build script's `bpy.ops.export_scene.vrm("EXEC_DEFAULT", ...)` invocation through to VRM file output. Maps the two bugs (D-019 lookAt enum case, D-020 migration structure search) and shows exactly where the guard was placed.*
+
+---
+
+### Step E0 — Build Script Invokes Export Operator
+
+```
+build_avatar.py:
+    bpy.ops.export_scene.vrm("EXEC_DEFAULT",
+                              filepath=output_path,
+                              armature_object_name=armature_name,
+                              ignore_warning=True)
+```
+
+Goes directly to `EXPORT_SCENE_OT_vrm.execute()` → `_export_vrm()`.
+The `invoke()` path (which opens GUI dialogs) is bypassed entirely.
+
+---
+
+### Step E1 — `_export_vrm()` — First Validation + Migration Pass
+
+```
+_export_vrm(filepath, export_preferences, context, armature_object_name)
+  │
+  ├─ WM_OT_vrm_validator.detect_errors(context, None, armature_object_name,
+  │                                     execute_migration=True)
+  │   │
+  │   ├─ validates export objects, materials, bones
+  │   │
+  │   ├─ validate_export_objects(..., execute_migration=True)
+  │   │   │
+  │   │   └─ migration.migrate(context, armature.name, heavy_migration=True)
+  │   │       │  ← FIRST MIGRATION CALL
+  │   │       │
+  │   │       ├─ Pop cache keys (lines 224-226)
+  │   │       ├─ fixup_human_bones(armature)
+  │   │       ├─ update_all_bone_name_candidates(context, name) [non-forced]
+  │   │       │   └─ may trigger structure search if cache stale
+  │   │       ├─ if initial_automatic_bone_assignment → auto-assign
+  │   │       ├─ version-specific migration checks
+  │   │       ├─ if heavy_migration: ★ GUARDED (D-020) ★
+  │   │       │   if not bones_are_correctly_assigned():
+  │   │       │       update_all_bone_name_candidates(force=True)
+  │   │       │           └─ ~1M hierarchy comparisons per bone slot
+  │   │       └─ update_vrm1_expression_ui_list_elements()
+  │   │
+  │   └─ validate_bone_order_vrm1(...)
+  │       └─ if filter_by_human_bone_hierarchy:
+  │           update_all_bone_name_candidates + hierarchy check
+  │           ← SKIPPED if filter_by_human_bone_hierarchy=False (D-009)
+  │
+  └─ if detect_errors returns True (fatal errors)
+      → return {"CANCELLED"}   ← export fails here
+```
+
+---
+
+### Step E2 — `_export_vrm()` — Second Migration Pass
+
+```
+export_scene.py line 292:
+  migration.migrate(context, armature_object.name, heavy_migration=True)
+  │  ← SECOND MIGRATION CALL (identical to first)
+  │
+  └─ Same flow as above.  The non-forced update at line 228
+     may hit cache (early return).  The forced update at line 312
+     was also guarded by the D-020 patch, so it only runs if
+     bones are NOT correctly assigned.
+```
+
+---
+
+### Step E3 — Exporter Executes
+
+```
+After both migration passes succeed:
+  │
+  ├─ KhrCharacterExporter / Vrm1Exporter / Vrm0Exporter created
+  │   based on armature extension type
+  │
+  └─ exporter.export()
+      → produces glb_bytes
+      → Path(filepath).write_bytes(glb_bytes)
+      → return {"FINISHED"}    ← VRM file written
+```
+
+---
+
+### Bug D-019 — lookAt Enum Case
+
+**Location:** `build_avatar.py` line 1339  
+**Root cause:** VRM 1.0 `lookAt.type` is a Blender `EnumProperty` whose identifiers are lowercase (`"bone"`, `"expression"`), defined in `property_group.py` line 669-677 via `property_group_enum()`. The build script set `look_at.type = "BONE"` (uppercase).  
+**Error:** `bpy_struct: item.attr = val: enum 'BONE' not found in ('bone', 'expression')`  
+**Fix:** Changed `"BONE"` → `"bone"`. The VRM Add-on itself uses `look_at.TYPE_BONE.identifier` which correctly returns `"bone"`.
+
+---
+
+### Bug D-020 — Migration Structure Search Overwrite
+
+**Location:** `migration.py` lines 312-317  
+**Root cause:** `migrate(heavy_migration=True)` unconditionally calls `update_all_bone_name_candidates(force=True)`. This triggers `HumanoidStructureBonePropertyGroup.update_all_vrm1_bone_name_candidates(armature_data)` → `find_bone_candidates()` for each of 52 bone slots × ~100 armature bones ≈ 1M hierarchy comparisons. On non-standard rigs (TurboSquid, MB-Lab), the rebuilt `bone_name_candidates` exclude manually-assigned bone names, which cascades to validation failures when `filter_by_human_bone_hierarchy=True`.
+
+**How it cascades to export failure:**
+1. Build script assigns explicit bone names (e.g., `hips → Hip`) and sets `initial_automatic_bone_assignment = False`, `filter_by_human_bone_hierarchy = False`
+2. Export calls `migrate(heavy_migration=True)` which forces the structure search
+3. The search rebuilds `bone_name_candidates` using VRM hierarchy conventions — TurboSquid naming (`Hip`, `Spine01`, etc.) doesn't match VRM expected hierarchy
+4. Correctly-assigned bone names may not appear in the rebuilt candidate lists
+5. If `filter_by_human_bone_hierarchy` were True, `error_messages()` would flag each mismatch as an error, causing `bones_are_correctly_assigned()` → False
+6. Even with the filter disabled, the 1M comparisons are wasted work adding ~30+ seconds to export
+
+**Fix:** Added guard at line 312:
+```python
+if heavy_migration:
+    if not human_bones.bones_are_correctly_assigned():
+        Vrm1HumanBonesPropertyGroup.update_all_bone_name_candidates(
+            context, armature_data.name, force=True
+        )
+```
+When `bones_are_correctly_assigned()` returns True (which it does when `allow_non_humanoid_rig=True` or `filter_by_human_bone_hierarchy=False`, or when all required bones are assigned and valid), the expensive force-refresh is skipped entirely. When bones are incorrectly assigned (missing required bones, duplicates, hierarchy violations), the search still runs to give the Add-on a chance to repair.
+
+---
+
+### Key Flow — `bones_are_correctly_assigned()` Decision Path
+
+```
+Vrm1HumanBonesPropertyGroup.bones_are_correctly_assigned()
+  └─ len(self.error_messages()) == 0
+      │
+      ├─ if self.allow_non_humanoid_rig:
+      │   └─ return []  (always True — builds set this, D-017)
+      │
+      └─ checks:
+          ├─ duplicate bone names across slots
+          ├─ for each required bone slot:
+          │   ├─ bone_name empty? → error if required
+          │   └─ bone_name not in bone_name_candidates?
+          │       └─ ONLY checked if filter_by_human_bone_hierarchy=True
+          │           (D-009 sets this to False, so this branch is skipped)
+          └─ parent requirement violations
+```
+
+---
+
+### VRM Add-on File Map (Version 3.27.0)
+
+```
+io_scene_vrm/
+├── exporter/
+│   ├── export_scene.py        ← EXPORT_SCENE_OT_vrm, _export_vrm()
+│   ├── vrm1_exporter.py       ← Vrm1Exporter
+│   └── ...
+├── editor/
+│   ├── migration.py           ← migrate(), is_unnecessary()  ★ D-020 patch ★
+│   ├── validation.py           ← WM_OT_vrm_validator.detect_errors()
+│   ├── property_group.py       ← HumanoidStructureBonePropertyGroup,
+│   │                              find_bone_candidates(),
+│   │                              update_all_vrm1_bone_name_candidates()
+│   └── vrm1/
+│       ├── property_group.py   ← Vrm1HumanBonesPropertyGroup,
+│       │  │                        bones_are_correctly_assigned(),
+│       │  │                        update_all_bone_name_candidates(force=)
+│       │  └── lookAt type enum: ("bone", 0), ("expression", 1)
+│       ├── migration.py        ← VRM1-specific migrate()
+│       ├── ops.py              ← assign_vrm1_humanoid_human_bones_automatically()
+│       └── ...
+└── ...
+```
+
+---
+
+### Patches Applied
+
+| Bug | File | Line | Change |
+|---|---|---|---|
+| D-019 | `build_avatar.py` | 1339 | `look_at.type = "BONE"` → `look_at.type = "bone"` |
+| D-020 | `migration.py` | 312-317 | Guard forced `update_all_bone_name_candidates(force=True)` with `bones_are_correctly_assigned()` check |

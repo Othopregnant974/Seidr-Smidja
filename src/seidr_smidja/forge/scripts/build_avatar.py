@@ -75,27 +75,27 @@ TURBOSQUID_BONE_MAP: dict[str, str] = {
     "hips": "Hip",
     "spine": "Spine01",
     "chest": "Spine02",
-    "upperChest": "L_RibsTwist",  # Best approximation — no dedicated UpperChest
+    "upperChest": "Spine03",
     "neck": "NeckTwist02",
     "head": "Head",
     # Left leg
     "leftUpperLeg": "L_Thigh",
     "leftLowerLeg": "L_Calf",
     "leftFoot": "L_Foot",
-    "leftToes": "L_ToeBase",
+    "leftToes": "L_Toe",
     # Right leg
     "rightUpperLeg": "R_Thigh",
     "rightLowerLeg": "R_Calf",
     "rightFoot": "R_Foot",
-    "rightToes": "R_ToeBase",
+    "rightToes": "R_Toe",
     # Left arm
-    "leftShoulder": "L_Clavicle",
-    "leftUpperArm": "L_Upperarm",
+    "leftShoulder": "L_Shoulder",
+    "leftUpperArm": "L_UpperArm",
     "leftLowerArm": "L_Forearm",
     "leftHand": "L_Hand",
     # Right arm
-    "rightShoulder": "R_Clavicle",
-    "rightUpperArm": "R_Upperarm",
+    "rightShoulder": "R_Shoulder",
+    "rightUpperArm": "R_UpperArm",
     "rightLowerArm": "R_Forearm",
     "rightHand": "R_Hand",
     # Left fingers
@@ -261,27 +261,23 @@ DEFAULT_BLEND_FACTORS = {
     "occlusion": 0.4,
 }
 
-# VRM 1.0 humanoid bone property names — direct mapping instead of fuzzy dir() matching.
-# This is the authoritative list of VRM1HumanBonesPropertyGroup child property names.
-# Using this avoids the fragile attribute-name-matching loop that could match wrong props.
-VRM1_HUMAN_BONE_PROPS = [
-    "hips", "spine", "chest", "upperChest", "neck", "head",
-    "leftUpperLeg", "rightUpperLeg", "leftLowerLeg", "rightLowerLeg",
-    "leftFoot", "rightFoot", "leftToes", "rightToes",
-    "leftShoulder", "rightShoulder", "leftUpperArm", "rightUpperArm",
-    "leftLowerArm", "rightLowerArm", "leftHand", "rightHand",
-    "leftThumbMetacarpal", "leftThumbProximal", "leftThumbDistal",
-    "rightThumbMetacarpal", "rightThumbProximal", "rightThumbDistal",
-    "leftIndexProximal", "leftIndexIntermediate", "leftIndexDistal",
-    "rightIndexProximal", "rightIndexIntermediate", "rightIndexDistal",
-    "leftMiddleProximal", "leftMiddleIntermediate", "leftMiddleDistal",
-    "rightMiddleProximal", "rightMiddleIntermediate", "rightMiddleDistal",
-    "leftRingProximal", "leftRingIntermediate", "leftRingDistal",
-    "rightRingProximal", "rightRingIntermediate", "rightRingDistal",
-    "leftLittleProximal", "leftLittleIntermediate", "leftLittleDistal",
-    "rightLittleProximal", "rightLittleIntermediate", "rightLittleDistal",
-    "leftEye", "rightEye", "jaw",
-]
+# ──────────────────────────────────────────────────────────────────────────────
+# D-018: VRM 1.0 humanoid bone mapping — canonical API pattern
+#
+# BUG FIXED: The previous approach used getattr(human_bones, vrm_bone_name) with
+# camelCase VRM spec names (e.g. "leftUpperLeg"), but Vrm1HumanBonesPropertyGroup
+# exposes PointerProperties as snake_case Python attributes (e.g. "left_upper_leg").
+# Only 6/55 bones mapped (hips, spine, chest, neck, head, jaw) because those happen
+# to have identical camelCase and snake_case names.
+#
+# CORRECT API: human_bones.human_bone_name_to_human_bone() returns a dict keyed by
+# HumanBoneName enums whose .value strings are the camelCase VRM names. We build
+# a reverse lookup from camelCase string → Vrm1HumanBonePropertyGroup, then set
+# bone_prop.node.bone_name = "ArmatureBoneName" on each.
+#
+# The old VRM1_HUMAN_BONE_PROPS list is REMOVED — it duplicated information already
+# available through the canonical API and was the source of the naming mismatch bug.
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 def main() -> int:
@@ -989,19 +985,30 @@ def _setup_vrm_humanoid(bpy, spec: dict, base_path: str) -> None:
         bone_map = {**bone_map, **spec_bones}
         logger.info("Applied %d spec bone overrides", len(spec_bones))
 
-    # ── Apply bone mappings using direct property access ────────────────────
-    # (D-015: replaced fuzzy dir() matching with direct VRM1_HUMAN_BONE_PROPS)
+    # ── Apply bone mappings using canonical PropertyGroup API ──────────────
+    # D-018: Use human_bone_name_to_human_bone() instead of getattr().
+    # The VRM spec uses camelCase ("leftUpperLeg") but the Blender
+    # PointerProperty attributes use snake_case ("left_upper_leg").
+    # getattr(human_bones, "leftUpperLeg") returns None — only 6/55 mapped.
+    # The canonical method resolves this: HumanBoneName.value = camelCase string.
     bone_names_in_armature = set(bone.name for bone in armature.data.bones)
     logger.info("Armature has %d bones", len(bone_names_in_armature))
+
+    # Build reverse lookup: camelCase VRM name → Vrm1HumanBonePropertyGroup
+    human_bone_dict = human_bones.human_bone_name_to_human_bone()
+    vrm_name_to_prop = {name.value: prop for name, prop in human_bone_dict.items()}
+    logger.debug("Canonical bone API: %d VRM bone slots available", len(vrm_name_to_prop))
 
     mapped_count = 0
     missing_bones = []
     duplicate_check = {}  # bone_name → vrm_bone_name
 
-    for vrm_bone_name in VRM1_HUMAN_BONE_PROPS:
-        target_bone = bone_map.get(vrm_bone_name)
-        if target_bone is None:
-            continue  # Not in our mapping — skip
+    for vrm_bone_name, target_bone in bone_map.items():
+        # Look up the PropertyGroup via canonical API (not getattr)
+        bone_prop = vrm_name_to_prop.get(vrm_bone_name)
+        if bone_prop is None:
+            missing_bones.append(f"{vrm_bone_name}(no VRM prop)")
+            continue
 
         if target_bone not in bone_names_in_armature:
             missing_bones.append(f"{vrm_bone_name}→{target_bone}(not found)")
@@ -1014,23 +1021,8 @@ def _setup_vrm_humanoid(bpy, spec: dict, base_path: str) -> None:
             continue
         duplicate_check[target_bone] = vrm_bone_name
 
-        # Direct property access (no fuzzy matching)
-        bone_prop = getattr(human_bones, vrm_bone_name, None)
-        if bone_prop is None or not hasattr(bone_prop, "node"):
-            missing_bones.append(f"{vrm_bone_name}(no VRM prop)")
-            continue
-
+        # Set bone mapping via the canonical .node.bone_name path
         bone_prop.node.bone_name = target_bone
-        # Also disable per-bone auto-assignment and hierarchy filtering
-        try:
-            bone_prop.initial_automatic_bone_assignment = False
-        except AttributeError:
-            pass
-        try:
-            bone_prop.filter_by_human_bone_hierarchy = False
-        except AttributeError:
-            pass
-
         mapped_count += 1
         logger.debug("Mapped '%s' → '%s'", vrm_bone_name, target_bone)
 
@@ -1336,7 +1328,10 @@ def _setup_vrm_look_at(bpy, spec: dict) -> None:
 
             try:
                 # Use bone rotation mode (D-012)
-                look_at.type = "BONE"
+                # D-019: VRM 1.0 enum identifiers are lowercase ('bone', 'expression').
+                # Setting uppercase 'BONE' triggers:
+                #   bpy_struct: item.attr = val: enum 'BONE' not found in ('bone', 'expression')
+                look_at.type = "bone"
 
                 # Find eye bones for offset calculation
                 armature = obj
