@@ -245,3 +245,140 @@ graph TD
 
 *Drawn at the second founding fire, 2026-05-06.*
 *Rúnhild Svartdóttir, Architect — for Volmarr Wyrd.*
+
+---
+
+## Brúarhönd (added 2026-05-06)
+
+**True Name:** Brúarhönd — *the Bridge-Hand*
+**Module:** `src/seidr_smidja/brunhand/`
+**One-line purpose:** The forge's reaching arm across the Tailscale wire — a bearer-authenticated daemon and client pair that lets an AI agent operate a live VRoid Studio session on a remote machine through precise GUI primitives, with screenshots returned through Oracle Eye.
+
+---
+
+### Domain Definition
+
+**Owns:**
+- `brunhand.client` (Hengilherðir) — the forge-side HTTP client for Brúarhönd, session management, Ljósbrú Oracle Eye adapter, exception hierarchy.
+- `brunhand.daemon` (Horfunarþjónn) — the FastAPI HTTP server that runs on the VRoid Studio host machine; all primitive handlers (screenshot, click, type, hotkey, drag, move, scroll, find_window, wait_for_window, vroid_export_vrm, vroid_save_project, vroid_open_project); bearer-token middleware (Gæslumaðr); capabilities registry (Sjálfsmöguleiki).
+- `brunhand.models` — shared pydantic envelope models (`BrunhandRequest`, `BrunhandResponse`, `BrunhandEnvelope`, `BrunhandResponseEnvelope`, `CapabilitiesManifest`, all `*Result` dataclasses).
+- `brunhand.exceptions` — the `BrunhandError` exception hierarchy.
+- `bridges.core.brunhand_dispatch()` — the parallel dispatch function that routes `BrunhandRequest` to Hengilherðir (owned by Bridge Core but architecturally part of the Brúarhönd surface).
+
+**Does not own:**
+- The Loom-to-Gate Blender pipeline — that belongs to Bridge Core's `dispatch()`.
+- `oracle_eye.render()` — Brúarhönd only calls `oracle_eye.register_external_render()`, the additive extension point.
+- Tailscale network configuration — Tailscale owns the overlay; Brúarhönd uses it without inspecting or managing it.
+- The VRoid host machine's OS or desktop session — Brúarhönd actuates the desktop but does not own it.
+
+**Depends on:**
+- `oracle_eye.register_external_render()` — for vision integration via Ljósbrú. This is the only Oracle Eye function Brúarhönd calls.
+- `annall.port` — `AnnallPort` injected at both the forge side (Hengilherðir) and the daemon side (Horfunarþjónn uses its own local SQLite Annáll instance).
+- `seidr_smidja.config` — for loading host addresses, bearer tokens, timeout values.
+- `httpx` — forge-side HTTP transport.
+- `pyautogui`, `mss`, `pygetwindow` — daemon-side GUI automation (optional install group).
+
+**Must not know about:**
+- `loom`, `hoard`, `forge`, `gate` — Brúarhönd is not part of the Blender build pipeline and imports from none of these.
+- `bridges.core.dispatch()` — Brúarhönd is called by bridges; it does not call the pipeline in return.
+- Any other domain's internal modules — dependencies flow outward through documented ports only.
+
+**Public contract:**
+- `brunhand.session(host, ...) -> ContextManager[Tengslastig]` — primary agent-facing API.
+- `bridges.core.brunhand_dispatch(request: BrunhandRequest, annall: AnnallPort, config) -> BrunhandResponse` — Bridge-facing entry point; always returns a response, never propagates unhandled exceptions.
+- `GET /v1/brunhand/health`, `GET /v1/brunhand/capabilities`, `POST /v1/brunhand/*` — daemon HTTP endpoints (full contract in `src/seidr_smidja/brunhand/daemon/INTERFACE.md`).
+
+---
+
+### Placement in the Dependency Graph
+
+Brúarhönd is a **lateral domain** — it does not sit inside the existing linear pipeline. It sits beside Bridge Core at Layer 3, invoked by the same Bridge sub-modules (Mjöll, Rúnstafr, Straumur, Skills) that call `dispatch()`.
+
+**The pipeline seam rule:**
+- `request.brunhand` absent → Bridge calls `bridges.core.dispatch()` (Blender build pipeline).
+- `request.brunhand` present → Bridge calls `bridges.core.brunhand_dispatch()` (VRoid GUI control).
+- Both present → Bridge calls `dispatch()` then `brunhand_dispatch()` sequentially, sharing the same `run_id` for Annáll cross-correlation.
+
+**What makes this lateral, not sequential:** Brúarhönd does not appear between any two steps of the Loom→Hoard→Forge→Oracle Eye→Gate pipeline. It runs beside the pipeline, not inside it. A Bridge chooses one arm or both — never inserts Brúarhönd into the middle of a Blender build.
+
+**The daemon is outside the forge's dependency chain entirely.** Horfunarþjónn is a separate process on a separate machine. From the forge's perspective, it is an HTTPS endpoint. It has no Python import relationship with any forge domain.
+
+**Annáll cross-correlation:** When `dispatch()` and `brunhand_dispatch()` are both called for the same agent request, both log to Annáll with the same `run_id`. This allows reconstruction of the full agent operation — Blender build and VRoid GUI control — as a single coherent session.
+
+---
+
+### Updated Domain Dependency Diagram
+
+The following diagram extends the original (above) by showing Brúarhönd's lateral position. The original pipeline is unchanged.
+
+```mermaid
+graph TD
+    subgraph Bridges ["Bridges (Bifröst) — L4"]
+        MJOLL[Mjöll — MCP]
+        RUNSTAFR[Rúnstafr — CLI]
+        STRAUMUR[Straumur — REST]
+        SKILLS[Skills — Manifests]
+    end
+
+    subgraph L3 ["Orchestration Layer — L3"]
+        CORE[Bridge Core — dispatch()\nBlender pipeline]
+        BHDISPATCH["Bridge Core — brunhand_dispatch()\nVRoid remote control"]
+    end
+
+    subgraph DomainCore ["Domain Core — L2"]
+        LOOM[Loom]
+        HOARD[Hoard]
+        FORGE[Forge]
+        ORACLE[Oracle Eye]
+        GATE[Gate]
+        HENGIL["Hengilherðir\n(BrunhandClient)"]
+    end
+
+    ANNALL["Annáll — L1"]
+
+    NET[/"network boundary\n(Tailscale / localhost)"\]
+    DAEMON["Horfunarþjónn\n(daemon on VRoid host)\nits own process"]
+
+    MJOLL -->|"brunhand absent"| CORE
+    RUNSTAFR -->|"brunhand absent"| CORE
+    STRAUMUR -->|"brunhand absent"| CORE
+    SKILLS -->|"brunhand absent"| CORE
+
+    MJOLL -->|"brunhand present"| BHDISPATCH
+    RUNSTAFR -->|"brunhand present"| BHDISPATCH
+    STRAUMUR -->|"brunhand present"| BHDISPATCH
+    SKILLS -->|"brunhand present"| BHDISPATCH
+
+    CORE --> LOOM
+    CORE --> HOARD
+    CORE --> FORGE
+    CORE --> ORACLE
+    CORE --> GATE
+    CORE --> ANNALL
+
+    BHDISPATCH --> HENGIL
+    BHDISPATCH --> ANNALL
+
+    HENGIL -->|"PNG via Ljósbrú"| ORACLE
+    HENGIL --> ANNALL
+    HENGIL --> NET
+    NET --> DAEMON
+    DAEMON -->|"local SQLite"| ANNALL_DAEMON["Annáll (daemon-local)"]
+
+    style DAEMON fill:#1a2e1a,color:#e0e0ff
+    style NET fill:#0a0a0a,color:#888888
+    style BHDISPATCH fill:#2e1a2e,color:#e0e0ff
+    style ANNALL_DAEMON fill:#1a1a2e,color:#888888
+    style ANNALL fill:#1a1a2e,color:#e0e0ff
+```
+
+**Forbidden directions (Brúarhönd-specific):**
+- Brúarhönd must not import from `loom`, `hoard`, `forge`, or `gate`.
+- Brúarhönd must not call `bridges.core.dispatch()` — causality does not loop.
+- Brúarhönd must not call `oracle_eye.render()` — only `register_external_render()`.
+- The daemon (Horfunarþjónn) must not make outbound HTTP calls to the forge — it only responds.
+
+---
+
+*Brúarhönd domain addendum drawn at the bridge-fire, 2026-05-06.*
+*Rúnhild Svartdóttir, Architect — for Volmarr Wyrd.*
